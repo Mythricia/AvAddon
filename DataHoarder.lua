@@ -6,7 +6,10 @@
 -- Housekeeping
 local addonName = ...
 print( addonName .. " loaded." )
+local doEventSpam = false
+local addonLoaded = false
 
+DataHoarderDB = DataHoarderDB or {}
 
 -- Pretty colors
 local cTag = "|cFF"
@@ -25,6 +28,7 @@ local colors = {
 
 
 -- Load DH database if it exists for this character, if not, create it and load defaults
+--[[
 local dbDefaults = {
 	
 	["ContinentsVisited"] = 0,
@@ -34,8 +38,18 @@ local dbDefaults = {
 		},
 		
 		["DPS"] = 0,
-	}
+	},
+	]]
 
+-- dbLoadDefaults
+local function dbLoadDefaults()
+-- Use the wipe() function supplied by the WoWLua API -
+-- This wipes the table but keeps all references to it intact
+wipe(DataHoarderDB)
+DataHoarderDB.ContinentsVisited = 0;
+DataHoarderDB.Continents = {};
+DataHoarderDB.DPS = 0;
+end
 
 
 -- We use a separate frame for this
@@ -47,9 +61,10 @@ dbLoadFrame:RegisterEvent("PLAYER_LOGOUT")
 
 local function initDB (self, event, ...)
 	if event == "ADDON_LOADED" and ... == addonName then
+		addonLoaded = true
 		if next(DataHoarderDB) == nil then
 			print("DataHoarderDB is nil/empty, loading defaults")
-			-- dbLoadDefaults()
+			dbLoadDefaults()
 		else
 			print("DataHoarderDB was not empty!")
 		end
@@ -69,27 +84,49 @@ local hookedEvents =
 	e_zoneChange = 	{"ZONE_CHANGED_NEW_AREA"},
 	e_bagOpen = 	{"BAG_UPDATE"},
 	e_chatXPMsg = 	{"CHAT_MSG_COMBAT_XP_GAIN"},
+	e_playerEnter = {"PLAYER_ENTERING_WORLD"},
 }
 
 local DHFrame = CreateFrame("frame", addonName..".".."DHFrame")
 DHFrame:UnregisterAllEvents()
 
-for i, v in pairs( hookedEvents ) do
+for k, v in pairs( hookedEvents ) do
 	DHFrame:RegisterEvent(v[1])
 end
 
 
-
+-------------------------------------------------------------
 -- Event response / handling
 local function handleEvent(self, event, ...)
-	print("\n")
-	print( addonName .. " caught event: " .. event)
-	local varArgs = {...}
-	for k, v in pairs( varArgs ) do
-		print( colors.cyan, k, colors.red, v )
+	if doEventSpam == true then
+		print("\n")
+		print( addonName .. " caught event: " .. event)
+		local varArgs = {...}
+		for k, v in pairs( varArgs ) do
+			print( colors.cyan, k, colors.red, v )
+		end
 	end
+	
+	if event == hookedEvents.e_zoneChange[1] then
+		local cont = AvUtil_GetPlayerMapInfos()[1]
+		-- if not AvUtil_TableContains(DataHoarderDB.Continents, cont) then
+		if DataHoarderDB.Continents[cont] == nil then 
+			print("First visit to "..cont.."!")
+			DataHoarderDB.Continents[cont] = {}
+			DataHoarderDB.Continents[cont].Visits = 1
+			DataHoarderDB.ContinentsVisited = DataHoarderDB.ContinentsVisited + 1
+		else
+			DataHoarderDB.Continents[cont].Visits = DataHoarderDB.Continents[cont].Visits + 1
+			print("Already visited "..cont.." "..DataHoarderDB.Continents[cont].Visits-1 .. " times")
+		end
+		-- else
+		-- end
+	end
+	
 end
+-------------------------------------------------------------
 
+-- Register frame for Event updates
 DHFrame:SetScript("OnEvent", handleEvent)
 
 
@@ -118,25 +155,17 @@ local function dbDelete(deldata)
 	table.remove(DataHoarderDB, deldata)
 end
 
--- dbLoadDefaults
-local function dbLoadDefaults()
-	-- Use the wipe() function supplied by the WoWLua API -
-	-- This wipes the table but keeps all references to it intact
-	wipe(DataHoarderDB)
-	DataHoarderDB.ContinentsVisited = 0;
-	DataHoarderDB.Continents = {};
-	DataHoarderDB.DPS = 0;
-end
 
 -- Horrible debug function that can do anything at any time
 local function runDebugFunction()
 	-- print"No dbfunc implemented right now"
-	local locString = ""
-	for k, v in pairs( AvUtil_GetPlayerMapInfos() ) do
-		-- print( k,v )
-		locString = locString..v..", "
-	end
-	print(locString)
+	
+	-- local locString = ""
+	-- for k, v in pairs( AvUtil_GetPlayerMapInfos() ) do
+	-- 	-- print( k,v )
+	-- 	locString = locString..v..", "
+	-- end
+	-- print(locString)
 end
 
 
@@ -144,6 +173,17 @@ end
 SLASH_AVADDON1, SLASH_AVADDON2 = '/ava', '/avaddon';
 
 local function slashHandler(msg)
+	local slashList = {
+		"listhooks",
+		"dbInsert",
+		"dbDelete",
+		"dbDefaults",
+		"dbDump",
+		"dbWipe",
+		"dfunc   "..colors.red.."--MAY DO ANYTHING, DEBUG FUNCTION",
+		"spam",
+	}
+	
 	local parts = {}
 	local cmd
 	
@@ -154,8 +194,8 @@ local function slashHandler(msg)
 	cmd = parts[1]
 
 	if cmd == 'listhooks' then
-		for i, v in ipairs( hookedEvents ) do
-			print( i,v )
+		for k, v in pairs( hookedEvents ) do
+			print( colors.red, v[1] )
 		end
 	elseif cmd == "dfunc" then
 		runDebugFunction()
@@ -173,15 +213,18 @@ local function slashHandler(msg)
 		dbLoadDefaults()
 	elseif cmd == "dbwipe" then
 		wipe(DataHoarderDB)
+	elseif cmd == "spam" then
+		doEventSpam = not doEventSpam
+		if doEventSpam then
+			print("AvAddon: Event spam "..colors.red.."enabled")
+		else
+			print("AvAddon: Event spam "..colors.green.."disabled")
+		end
 	else
 		print("AvAddon commands:")
-		print("    listhooks")
-		print("    dbInsert <arg>")
-		print("    dbDelete <index>")
-		print("    dbDefaults")		
-		print("    dbDump")
-		print("    dbWipe")
-		print("    dfunc   "..colors.red.."--MAY DO ANYTHING, DEBUG FUNCTION")
+		for k, v in pairs( slashList ) do
+			print( colors.orange, v )
+		end
 	end
 end
 
