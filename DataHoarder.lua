@@ -46,6 +46,7 @@ local function dbLoadDefaults()
 -- Use the wipe() function supplied by the WoWLua API -
 -- This wipes the table but keeps all references to it intact
 wipe(DataHoarderDB)
+DataHoarderDB.LastContinent = ""
 DataHoarderDB.ContinentsVisited = 0;
 DataHoarderDB.Continents = {};
 DataHoarderDB.DPS = 0;
@@ -109,7 +110,11 @@ local function handleEvent(self, event, ...)
 	
 	if event == hookedEvents.e_zoneChange[1] then
 		local cont = AvUtil_GetPlayerMapInfos()[1]
-		-- if not AvUtil_TableContains(DataHoarderDB.Continents, cont) then
+		if DataHoarderDB.LastContinent == cont then
+			do return end
+		end
+		
+		DataHoarderDB.LastContinent = cont
 		if DataHoarderDB.Continents[cont] == nil then 
 			print("First visit to "..cont.."!")
 			DataHoarderDB.Continents[cont] = {}
@@ -119,10 +124,7 @@ local function handleEvent(self, event, ...)
 			DataHoarderDB.Continents[cont].Visits = DataHoarderDB.Continents[cont].Visits + 1
 			print("Already visited "..cont.." "..DataHoarderDB.Continents[cont].Visits-1 .. " times")
 		end
-		-- else
-		-- end
 	end
-	
 end
 -------------------------------------------------------------
 

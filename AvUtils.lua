@@ -34,6 +34,26 @@ function AvUtil_TableDeepCopy(o, seen)
 end
 
 
+
+-- Generates table of Continent names from the WoW API directly
+-- Will always know all continents, and avoids mis-spellings
+local function generateContNames()
+	local contList = {GetMapContinents()}
+	local nameTable = {}
+
+	for k, v in ipairs(contList) do
+		if not tonumber(v) then
+			table.insert(nameTable, v)
+		end
+	end
+
+	print("Continent Table generated from WoW API")
+	
+	return nameTable
+end
+
+
+
 -- Extracts the current, actual, Continent, Zone, and SubZone of the player
 -- Also restores the players world map to whatever they were viewing,
 -- which should make the query invisible
@@ -45,16 +65,17 @@ function AvUtil_GetPlayerMapInfos()
 	-- Move the world map view to the players current zone
 	SetMapToCurrentZone()
 
-	local continentNames = {
-		[1]="Kalimdor",
-		[2]="Eastern Kingoms",
-		[3]="Outland",
-		[4]="Northrend",
-		[5]="The Maelstrom",
-		[6]="Pandaria",
-		[7]="Draenor",
-		[8]="Broken Isles"
-	}
+	continentNames = continentNames or generateContNames()
+	-- {
+	-- 	[1]="Kalimdor",
+	-- 	[2]="Eastern Kingdoms",
+	-- 	[3]="Outland",
+	-- 	[4]="Northrend",
+	-- 	[5]="The Maelstrom",
+	-- 	[6]="Pandaria",
+	-- 	[7]="Draenor",
+	-- 	[8]="Broken Isles"
+	-- }
 
 	local contID = GetCurrentMapContinent()
 	local contName = continentNames[contID]
