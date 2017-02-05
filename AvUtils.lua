@@ -13,6 +13,7 @@ function AvUtil_FormatDecimalString(inputString, precision)
 end
 
 
+
 -- Deep table copy function, returns a new table identical to <o>
 -- DO NOT pass a second argument, it is used recursively by the copy
 function AvUtil_TableDeepCopy(o, seen)
@@ -37,7 +38,7 @@ end
 
 -- Generates table of Continent names from the WoW API directly
 -- Will always know all continents, and avoids mis-spellings
-local function generateContNames()
+function AvUtil_GenerateContNames()
 	local contList = {GetMapContinents()}
 	local nameTable = {}
 
@@ -65,7 +66,7 @@ function AvUtil_GetPlayerMapInfos()
 	-- Move the world map view to the players current zone
 	SetMapToCurrentZone()
 
-	continentNames = continentNames or generateContNames()
+	continentNames = continentNames or AvUtil_GenerateContNames()
 	-- {
 	-- 	[1]="Kalimdor",
 	-- 	[2]="Eastern Kingdoms",
@@ -87,6 +88,7 @@ function AvUtil_GetPlayerMapInfos()
 	
 	return ({contName,zone ,subzone})
 end
+
 
 
 -- Check if table contains an element

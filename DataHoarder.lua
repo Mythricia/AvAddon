@@ -1,15 +1,32 @@
 -- DataHoarder collects data pertaining to the current character, for use in TellMyStory
 -- By: Avael @ Argent Dawn EU
 
-
-
 -- Housekeeping
 local addonName = ...
 print( addonName .. " loaded." )
 local doEventSpam = false
-local addonLoaded = false
+local isAddonLoaded = false
 
+-- This shouldn't be here, but it's here, so that I don't get a nil error when initializing DB below...
 DataHoarderDB = DataHoarderDB or {}
+
+
+
+-- Cache some common functions
+-- Common lua:
+local table_insert = table.insert;
+local type = type;
+local string_len = string.len;
+local string_sub = string.sub;
+local string_gsub = string.gsub;
+local string_format = string.format;
+local string_match = string.match;
+
+-- AvUtils
+local au_genContNames = AvUtil_GenerateContNames;
+local au_getPMapInfos = AvUtil_GetPlayerMapInfos;
+
+
 
 -- Pretty colors
 local cTag = "|cFF"
@@ -28,19 +45,6 @@ local colors = {
 
 
 -- Load DH database if it exists for this character, if not, create it and load defaults
---[[
-local dbDefaults = {
-	
-	["ContinentsVisited"] = 0,
-	
-	["Continents"] = {
-		
-		},
-		
-		["DPS"] = 0,
-	},
-	]]
-
 -- dbLoadDefaults
 local function dbLoadDefaults()
 -- Use the wipe() function supplied by the WoWLua API -
@@ -62,7 +66,7 @@ dbLoadFrame:RegisterEvent("PLAYER_LOGOUT")
 
 local function initDB (self, event, ...)
 	if event == "ADDON_LOADED" and ... == addonName then
-		addonLoaded = true
+		isAddonLoaded = true
 		if next(DataHoarderDB) == nil then
 			print("DataHoarderDB is nil/empty, loading defaults")
 			dbLoadDefaults()
@@ -109,7 +113,7 @@ local function handleEvent(self, event, ...)
 	end
 	
 	if event == hookedEvents.e_zoneChange[1] then
-		local cont = AvUtil_GetPlayerMapInfos()[1]
+		local cont = au_getPMapInfos()[1]
 		if DataHoarderDB.LastContinent == cont then
 			do return end
 		end
@@ -163,7 +167,7 @@ local function runDebugFunction()
 	-- print"No dbfunc implemented right now"
 	
 	-- local locString = ""
-	-- for k, v in pairs( AvUtil_GetPlayerMapInfos() ) do
+	-- for k, v in pairs( au_getPMapInfos() ) do
 	-- 	-- print( k,v )
 	-- 	locString = locString..v..", "
 	-- end
