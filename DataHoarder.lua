@@ -3,7 +3,7 @@
 
 -- Housekeeping
 local addonName = ...
-print( addonName .. " loaded." )
+local rainbowName = "|cFF9400D3A|r|cFF4B0082v|r|cFFEE1289A|r|cFF00FF00d|r|cFFFFFF00d|r|cFFFF7F00o|r|cFFFF0000n|r"
 local doEventSpam = false
 local isAddonLoaded = false
 
@@ -24,7 +24,7 @@ local string_match = string.match;
 
 -- AvUtils
 local au_genContNames = AvUtil_GenerateContNames;
-local au_getPMapInfos = AvUtil_GetPlayerMapInfos;
+local au_getPMapInfos = AvUtil_GetPlayerMapInfos;	-- {contName, zone, subzone}
 
 
 
@@ -36,7 +36,7 @@ local colors = {
 	green	= cTag.."00FF00",
 	blue	= cTag.."0000FF",
 	cyan	= cTag.."00FFFF",
-	teal	= cTag.."000808",
+	teal	= cTag.."008080",
 	orange	= cTag.."FFA500",
 	brown	= cTag.."8B4500",
 	pink	= cTag.."EE1289",
@@ -50,8 +50,11 @@ local function dbLoadDefaults()
 -- Use the wipe() function supplied by the WoWLua API -
 -- This wipes the table but keeps all references to it intact
 wipe(DataHoarderDB)
+DataHoarderDB.Character = UnitName("player")
 DataHoarderDB.LastContinent = ""
+DataHoarderDB.LastZone = ""
 DataHoarderDB.ContinentsVisited = 0;
+DataHoarderDB.ZonesVisited = 0;
 DataHoarderDB.Continents = {};
 DataHoarderDB.DPS = 0;
 end
@@ -67,11 +70,15 @@ dbLoadFrame:RegisterEvent("PLAYER_LOGOUT")
 local function initDB (self, event, ...)
 	if event == "ADDON_LOADED" and ... == addonName then
 		isAddonLoaded = true
+		print( rainbowName .. " loaded. ".."\nUse "..colors.cyan.."/ava spam|r to see logging activity."..
+			"\nUse "..colors.cyan.."/ava|r to see options "..colors.red.."(beware dragons)\n");
+		DataHoarderDB.Character = UnitName("player")
+		
 		if next(DataHoarderDB) == nil then
-			print("DataHoarderDB is nil/empty, loading defaults")
+			print("DataHoarderDB is "..colors.red.."nil/empty, |rloading defaults")
 			dbLoadDefaults()
 		else
-			print("DataHoarderDB was not empty!")
+			print("Good news everyone, "..colors.green.."DataHoarderDB was not empty!")
 		end
 	elseif event == "PLAYER_LOGOUT" then
 		print("PlayerLogout")
@@ -104,8 +111,7 @@ end
 -- Event response / handling
 local function handleEvent(self, event, ...)
 	if doEventSpam == true then
-		print("\n")
-		print( addonName .. " caught event: " .. event)
+		print( colors.cyan .. addonName .. " caught event: " .. colors.red .. event)
 		local varArgs = {...}
 		for k, v in pairs( varArgs ) do
 			print( colors.cyan, k, colors.red, v )
@@ -113,20 +119,47 @@ local function handleEvent(self, event, ...)
 	end
 	
 	if event == hookedEvents.e_zoneChange[1] then
-		local cont = au_getPMapInfos()[1]
-		if DataHoarderDB.LastContinent == cont then
-			do return end
+		local cont = au_getPMapInfos()[1];
+		local zone = au_getPMapInfos()[2];
+		if doEventSpam then
+			print (colors.cyan .. "Character location: " .. colors.red .. cont..colors.green.." > "..colors.red..zone)
 		end
 		
-		DataHoarderDB.LastContinent = cont
-		if DataHoarderDB.Continents[cont] == nil then 
-			print("First visit to "..cont.."!")
-			DataHoarderDB.Continents[cont] = {}
-			DataHoarderDB.Continents[cont].Visits = 1
-			DataHoarderDB.ContinentsVisited = DataHoarderDB.ContinentsVisited + 1
-		else
-			DataHoarderDB.Continents[cont].Visits = DataHoarderDB.Continents[cont].Visits + 1
-			print("Already visited "..cont.." "..DataHoarderDB.Continents[cont].Visits-1 .. " times")
+		if DataHoarderDB.LastContinent ~= cont then
+			DataHoarderDB.LastContinent = cont
+			
+			if DataHoarderDB.Continents[cont] == nil then 
+				if doEventSpam then
+					print("First visit to "..cont.."!")
+				end
+				DataHoarderDB.Continents[cont] = {}
+				DataHoarderDB.Continents[cont].Visits = 1
+				DataHoarderDB.ContinentsVisited = DataHoarderDB.ContinentsVisited + 1
+			else
+				DataHoarderDB.Continents[cont].Visits = DataHoarderDB.Continents[cont].Visits + 1
+				if doEventSpam then
+					print("Already visited "..cont.." "..DataHoarderDB.Continents[cont].Visits-1 .. " times")
+				end
+			end
+		end
+		
+		
+		if DataHoarderDB.LastZone ~= zone then
+			DataHoarderDB.LastZone = zone
+			
+			if DataHoarderDB.Continents[cont][zone] == nil then
+				if doEventSpam then
+					print("First visit to "..zone.."!")
+				end
+				DataHoarderDB.Continents[cont][zone] = {}
+				DataHoarderDB.Continents[cont][zone].Visits = 1
+				DataHoarderDB.ZonesVisited = DataHoarderDB.ZonesVisited + 1
+			else
+				DataHoarderDB.Continents[cont][zone].Visits = DataHoarderDB.Continents[cont][zone].Visits + 1
+				if doEventSpam then
+					print("Already visited "..zone.." "..DataHoarderDB.Continents[cont][zone].Visits-1 .. " times")
+				end
+			end
 		end
 	end
 end
@@ -164,14 +197,7 @@ end
 
 -- Horrible debug function that can do anything at any time
 local function runDebugFunction()
-	-- print"No dbfunc implemented right now"
-	
-	-- local locString = ""
-	-- for k, v in pairs( au_getPMapInfos() ) do
-	-- 	-- print( k,v )
-	-- 	locString = locString..v..", "
-	-- end
-	-- print(locString)
+	print(colors.pink.. "Nope.")
 end
 
 
@@ -219,15 +245,16 @@ local function slashHandler(msg)
 		dbLoadDefaults()
 	elseif cmd == "dbwipe" then
 		wipe(DataHoarderDB)
+		print(colors.cyan.."DataHoarderDB"..colors.red.." wiped.")
 	elseif cmd == "spam" then
 		doEventSpam = not doEventSpam
 		if doEventSpam then
-			print("AvAddon: Event spam "..colors.red.."enabled")
+			print(rainbowName..": Event spam "..colors.red.."enabled")
 		else
-			print("AvAddon: Event spam "..colors.green.."disabled")
+			print(rainbowName..": Event spam "..colors.green.."disabled")
 		end
 	else
-		print("AvAddon commands:")
+		print(rainbowName.." commands:")
 		for k, v in pairs( slashList ) do
 			print( colors.orange, v )
 		end
