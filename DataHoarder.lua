@@ -25,6 +25,7 @@ local string_match = string.match;
 -- AvUtils
 local au_genContNames = AvUtil_GenerateContNames;
 local au_getPMapInfos = AvUtil_GetPlayerMapInfos;	-- {contName, zone, subzone}
+local au_strFmt = AvUtil_FormatDecimalString;
 
 
 
@@ -92,10 +93,7 @@ dbLoadFrame:SetScript("OnEvent", initDB)
 -- List of events to hook, as well as the actual hooking of said events
 local hookedEvents = 
 {
-	e_playerXP = 	{"PLAYER_XP_UPDATE"},
 	e_zoneChange = 	{"ZONE_CHANGED_NEW_AREA"},
-	e_bagOpen = 	{"BAG_UPDATE"},
-	e_chatXPMsg = 	{"CHAT_MSG_COMBAT_XP_GAIN"},
 	e_playerEnter = {"PLAYER_ENTERING_WORLD"},
 }
 
