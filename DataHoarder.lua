@@ -8,9 +8,9 @@ local doEventSpam = false
 local isAddonLoaded = false
 local inCombat = false
 
--- This shouldn't be here, but it's here, so that I don't get a nil error when initializing DB below...
-DataHoarderDB = DataHoarderDB or {}
 
+-- This shouldn't be here, but it's here, so that I don't get a nil error when initializing DB later...
+DataHoarderDB = DataHoarderDB or {}
 
 
 -- Cache some common functions
@@ -29,11 +29,9 @@ local au_getPMapInfos = AvUtil_GetPlayerMapInfos;	-- {contName, zone, subzone}
 local au_strFmt = AvUtil_FormatDecimalString;
 
 
-
 -- Pretty colors
-local cTag = "|cFF"
-
-local colors = {
+local cTag = "|cFF"	-- Separate the tag and Alpha (always FF) from the actual hex color definitions
+local color = {
 	red 	= cTag.."FF0000",
 	green	= cTag.."00FF00",
 	blue	= cTag.."0000FF",
@@ -47,10 +45,12 @@ local colors = {
 
 
 -- Load DH database if it exists for this character, if not, create it and load defaults
--- dbLoadDefaults
+-- This function can also be called ingame by /ava dbDefaults
 local function dbLoadDefaults()
 -- Use the wipe() function supplied by the WoWLua API -
 -- This wipes the table but keeps all references to it intact
+wipe(DataHoarderDB)
+
 DataHoarderDB.Character = UnitName("player")
 DataHoarderDB.LastContinent = ""
 DataHoarderDB.LastZone = ""
@@ -61,20 +61,22 @@ DataHoarderDB.DPS = 0;
 end
 
 
--- We use a separate frame for this
+-- Check if addon has been fully loaded, we use a separate frame for this
+-- TODO: Should re-use a single frame throughout this application
+
 local dbLoadFrame = CreateFrame("frame", addonName..".".."dbLoadFrame")
 dbLoadFrame:UnregisterAllEvents()
 dbLoadFrame:RegisterEvent("ADDON_LOADED")
-dbLoadFrame:RegisterEvent("PLAYER_LOGOUT")
 
-
+-- We're loaded, check if DB needs to be initialized, if so load defaults; else continue as normal
 local function initDB (self, event, ...)
 	if event == "ADDON_LOADED" and ... == addonName then
 		isAddonLoaded = true
-		print( rainbowName .. " loaded. ".."\nUse "..colors.cyan.."/ava spam|r to see logging activity."..
-			"\nUse "..colors.cyan.."/ava|r to see options "..colors.red.."(beware dragons)\n");
+		print( rainbowName .. " loaded. ".."\nUse "..color.cyan.."/ava spam|r to see logging activity."..
+			"\nUse "..color.cyan.."/ava|r to see options "..color.red.."(beware dragons)\n");
 		
-		-- Table gynmastics to find out whether it's actually initialized or not, and if not, load the defaults
+		-- Table gynmastics to find out whether database is actually populated (count num of Keys, can't rely on #length)
+		-- If not, load the defaults
 		local function dbSize()
 			local i = 0
 			for k, v in pairs(DataHoarderDB) do
@@ -84,99 +86,136 @@ local function initDB (self, event, ...)
 		end
 		
 		if (dbSize() == 0) then
-			print("DataHoarderDB is "..colors.red.."nil/empty, |rloading defaults")
+			print("DataHoarderDB is "..color.red.."nil/empty, |rloading defaults")
 			dbLoadDefaults()
 		else
-			print("Good news everyone, "..colors.green.."DataHoarderDB was not empty!")
+			print("Good news everyone, "..color.green.."DataHoarderDB was not empty!")
 		end
-	elseif event == "PLAYER_LOGOUT" then
-		print("PlayerLogout")
 	end
 end
 
+-- Register the db init to our addon load frame
 dbLoadFrame:SetScript("OnEvent", initDB)
 
 
 
--- List of events to hook, as well as the actual hooking of said events
-local hookedEvents = 
-{
-	e_zoneChange 	= "ZONE_CHANGED_NEW_AREA",
-	e_playerEnter 	= "PLAYER_ENTERING_WORLD",
-	e_combatLogUnf 	= "COMBAT_LOG_EVENT_UNFILTERED",
-	e_startCombat 	= "PLAYER_REGEN_DISABLED",
-	e_endCombat 	= "PLAYER_REGEN_ENABLED",
-}
+---------------------BEGIN---------------------
+-- -- Individual event handling functions -- --
+-----------------------------------------------
+-- Event hook table, init as empty!
+local hookedEvents = {}
 
+
+-- Zone change, collect continent and zone information and count number of visits
+function hookedEvents.ZONE_CHANGED_NEW_AREA(...)
+	local cont = au_getPMapInfos()[1];
+	local zone = au_getPMapInfos()[2];
+	if doEventSpam then
+		print (color.cyan .. "Character location: " .. color.red .. cont..color.green.." > "..color.red..zone)
+	end
+
+	if DataHoarderDB.LastContinent ~= cont then
+		DataHoarderDB.LastContinent = cont
+		
+		if DataHoarderDB.Continents[cont] == nil then 
+			if doEventSpam then
+				print("First visit to "..cont.."!")
+			end
+			DataHoarderDB.Continents[cont] = {}
+			DataHoarderDB.Continents[cont].Visits = 1
+			DataHoarderDB.ContinentsVisited = DataHoarderDB.ContinentsVisited + 1
+		else
+			DataHoarderDB.Continents[cont].Visits = DataHoarderDB.Continents[cont].Visits + 1
+			if doEventSpam then
+				print("Already visited "..cont.." "..DataHoarderDB.Continents[cont].Visits-1 .. " times")
+			end
+		end
+	end
+
+	if DataHoarderDB.LastZone ~= zone then
+		DataHoarderDB.LastZone = zone
+		
+		if DataHoarderDB.Continents[cont][zone] == nil then
+			if doEventSpam then
+				print("First visit to "..zone.."!")
+			end
+			DataHoarderDB.Continents[cont][zone] = {}
+			DataHoarderDB.Continents[cont][zone].Visits = 1
+			DataHoarderDB.ZonesVisited = DataHoarderDB.ZonesVisited + 1
+		else
+			DataHoarderDB.Continents[cont][zone].Visits = DataHoarderDB.Continents[cont][zone].Visits + 1
+			if doEventSpam then
+				print("Already visited "..zone.." "..DataHoarderDB.Continents[cont][zone].Visits-1 .. " times")
+			end
+		end
+	end
+	
+	-- Tell the event dispatcher we've handled the event
+	return true
+end
+
+
+
+hookedEvents.PLAYER_ENTERING_WORLD = function(...)
+--- handle this event
+end
+
+
+
+hookedEvents.COMBAT_LOG_EVENT_UNFILTERED = function(...)
+--- handle this event
+end
+
+
+
+hookedEvents.PLAYER_REGEN_DISABLED = function(...)
+--- handle this event
+end
+
+
+
+hookedEvents.PLAYER_REGEN_ENABLED = function(...)
+--- handle this event
+end
+
+----------------------END----------------------
+-- -- Individual event handling functions -- --
+-----------------------------------------------
+
+
+-- Create frame, unregister all events in case we're re-using a frame, finally register all listed events 
 local DHFrame = CreateFrame("frame", addonName..".".."DHFrame")
 DHFrame:UnregisterAllEvents()
 
 for k, v in pairs( hookedEvents ) do
-	DHFrame:RegisterEvent(v)
+	DHFrame:RegisterEvent(k)
 end
 
 
--------------------------------------------------------------
--- Event response / handling
-local function handleEvent(self, event, ...)
+-- Event catcher / handler dispatcher, aslo works as a generic event handler (called on every registered event caught regardless of type)
+local function catchEvent(self, event, ...)
 	
+	-- Check if we should enable verbose output
 	if doEventSpam == true then
-		print( colors.cyan .. addonName .. " caught event: " .. colors.red .. event)
+		print( color.cyan .. addonName .. " caught event: " .. color.red .. event)
 		local varArgs = {...}
 		for k, v in pairs( varArgs ) do
-			print( colors.cyan, k, colors.red, v )
+			print( color.cyan, k, color.red, v )
 		end
 	end
 	
-	if event == hookedEvents.e_zoneChange then
-		local cont = au_getPMapInfos()[1];
-		local zone = au_getPMapInfos()[2];
-		if doEventSpam then
-			print (colors.cyan .. "Character location: " .. colors.red .. cont..colors.green.." > "..colors.red..zone)
-		end
-		
-		if DataHoarderDB.LastContinent ~= cont then
-			DataHoarderDB.LastContinent = cont
-			
-			if DataHoarderDB.Continents[cont] == nil then 
-				if doEventSpam then
-					print("First visit to "..cont.."!")
-				end
-				DataHoarderDB.Continents[cont] = {}
-				DataHoarderDB.Continents[cont].Visits = 1
-				DataHoarderDB.ContinentsVisited = DataHoarderDB.ContinentsVisited + 1
-			else
-				DataHoarderDB.Continents[cont].Visits = DataHoarderDB.Continents[cont].Visits + 1
-				if doEventSpam then
-					print("Already visited "..cont.." "..DataHoarderDB.Continents[cont].Visits-1 .. " times")
-				end
-			end
-		end
-		
-		
-		if DataHoarderDB.LastZone ~= zone then
-			DataHoarderDB.LastZone = zone
-			
-			if DataHoarderDB.Continents[cont][zone] == nil then
-				if doEventSpam then
-					print("First visit to "..zone.."!")
-				end
-				DataHoarderDB.Continents[cont][zone] = {}
-				DataHoarderDB.Continents[cont][zone].Visits = 1
-				DataHoarderDB.ZonesVisited = DataHoarderDB.ZonesVisited + 1
-			else
-				DataHoarderDB.Continents[cont][zone].Visits = DataHoarderDB.Continents[cont][zone].Visits + 1
-				if doEventSpam then
-					print("Already visited "..zone.." "..DataHoarderDB.Continents[cont][zone].Visits-1 .. " times")
-				end
-			end
-		end
+	
+	-- Call the relevant event handler function, if defined
+	if (hookedEvents[event] == nil) or (hookedEvents[event]() == nil) then
+		local errString = (color.red.."DataHoarder:: No event handler for:\n"..color.orange..event)
+		print(errString)
+		error(errString)
 	end
 end
--------------------------------------------------------------
 
--- Register frame for Event updates
-DHFrame:SetScript("OnEvent", handleEvent)
+
+-- Subscribe to OnEvent updates, using our frame and event catcher
+DHFrame:SetScript("OnEvent", catchEvent)
 
 
 
@@ -195,7 +234,7 @@ local function dbDump()
 	print("\n")
 	print("DataHoarderDB contents:")
 	for k, v in pairs( DataHoarderDB ) do
-		print( k, colors.cyan, v )
+		print( k, color.cyan, v )
 	end
 end
 
@@ -204,10 +243,9 @@ local function dbDelete(deldata)
 	table.remove(DataHoarderDB, deldata)
 end
 
-
 -- Horrible debug function that can do anything at any time
 local function runDebugFunction()
-	print(colors.pink.. "Nope.")
+	print(color.pink.. "Nope.")
 end
 
 
@@ -222,7 +260,7 @@ local function slashHandler(msg)
 		"dbDefaults",
 		"dbDump",
 		"dbWipe",
-		"dfunc   "..colors.red.."--MAY DO ANYTHING, DEBUG FUNCTION",
+		"dfunc   "..color.red.."--MAY DO ANYTHING, DEBUG FUNCTION",
 		"spam",
 	}
 	
@@ -237,7 +275,7 @@ local function slashHandler(msg)
 
 	if cmd == 'listhooks' then
 		for k, v in pairs( hookedEvents ) do
-			print( colors.red, v )
+			print( color.red, v )
 		end
 	elseif cmd == "dfunc" then
 		runDebugFunction()
@@ -255,18 +293,18 @@ local function slashHandler(msg)
 		dbLoadDefaults()
 	elseif cmd == "dbwipe" then
 		wipe(DataHoarderDB)
-		print(colors.cyan.."DataHoarderDB"..colors.red.." wiped.")
+		print(color.cyan.."DataHoarderDB"..color.red.." wiped.")
 	elseif cmd == "spam" then
 		doEventSpam = not doEventSpam
 		if doEventSpam then
-			print(rainbowName..": Event spam "..colors.red.."enabled")
+			print(rainbowName..": Event spam "..color.red.."enabled")
 		else
-			print(rainbowName..": Event spam "..colors.green.."disabled")
+			print(rainbowName..": Event spam "..color.green.."disabled")
 		end
 	else
 		print(rainbowName.." commands:")
 		for k, v in pairs( slashList ) do
-			print( colors.orange, v )
+			print( color.orange, v )
 		end
 	end
 end
