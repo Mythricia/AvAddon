@@ -1,6 +1,9 @@
 -- DataHoarder & TellMyStory Utilities
 -- By: Avael @ Argent Dawn EU
 
+local rainbowName = "|cFF9400D3A|r|cFF4B0082v|r|cFFEE1289A|r|cFF00FF00d|r|cFFFFFF00d|r|cFFFF7F00o|r|cFFFF0000n|r"
+
+
 -- str_FormatDecimal(float, integer)
 -- Wrapper for string.format("%.nf", s) where n is number of decimal places and s is input string
 function AvUtil_FormatDecimalString(inputString, precision)
@@ -48,7 +51,7 @@ function AvUtil_GenerateContNames()
 		end
 	end
 
-	print("Continent Table generated from WoW API")
+	print(rainbowName..": Continent Table generated from WoW API")
 	
 	return nameTable
 end
