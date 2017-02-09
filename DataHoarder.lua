@@ -1,11 +1,12 @@
 -- DataHoarder collects data pertaining to the current character, for use in TellMyStory
 -- By: Avael @ Argent Dawn EU
 
--- Housekeeping
+-- Local vars
 local addonName = ...
 local rainbowName = "|cFF9400D3A|r|cFF4B0082v|r|cFFEE1289A|r|cFF00FF00d|r|cFFFFFF00d|r|cFFFF7F00o|r|cFFFF0000n|r"
 local doEventSpam = false
 local isAddonLoaded = false
+local inCombat = false
 
 -- This shouldn't be here, but it's here, so that I don't get a nil error when initializing DB below...
 DataHoarderDB = DataHoarderDB or {}
@@ -50,7 +51,6 @@ local colors = {
 local function dbLoadDefaults()
 -- Use the wipe() function supplied by the WoWLua API -
 -- This wipes the table but keeps all references to it intact
-wipe(DataHoarderDB)
 DataHoarderDB.Character = UnitName("player")
 DataHoarderDB.LastContinent = ""
 DataHoarderDB.LastZone = ""
@@ -73,9 +73,17 @@ local function initDB (self, event, ...)
 		isAddonLoaded = true
 		print( rainbowName .. " loaded. ".."\nUse "..colors.cyan.."/ava spam|r to see logging activity."..
 			"\nUse "..colors.cyan.."/ava|r to see options "..colors.red.."(beware dragons)\n");
-		DataHoarderDB.Character = UnitName("player")
 		
-		if next(DataHoarderDB) == nil then
+		-- Table gynmastics to find out whether it's actually initialized or not, and if not, load the defaults
+		local function dbSize()
+			local i = 0
+			for k, v in pairs(DataHoarderDB) do
+				i = i + 1
+			end
+			return i
+		end
+		
+		if (dbSize() == 0) then
 			print("DataHoarderDB is "..colors.red.."nil/empty, |rloading defaults")
 			dbLoadDefaults()
 		else
@@ -93,21 +101,25 @@ dbLoadFrame:SetScript("OnEvent", initDB)
 -- List of events to hook, as well as the actual hooking of said events
 local hookedEvents = 
 {
-	e_zoneChange = 	{"ZONE_CHANGED_NEW_AREA"},
-	e_playerEnter = {"PLAYER_ENTERING_WORLD"},
+	e_zoneChange 	= "ZONE_CHANGED_NEW_AREA",
+	e_playerEnter 	= "PLAYER_ENTERING_WORLD",
+	e_combatLogUnf 	= "COMBAT_LOG_EVENT_UNFILTERED",
+	e_startCombat 	= "PLAYER_REGEN_DISABLED",
+	e_endCombat 	= "PLAYER_REGEN_ENABLED",
 }
 
 local DHFrame = CreateFrame("frame", addonName..".".."DHFrame")
 DHFrame:UnregisterAllEvents()
 
 for k, v in pairs( hookedEvents ) do
-	DHFrame:RegisterEvent(v[1])
+	DHFrame:RegisterEvent(v)
 end
 
 
 -------------------------------------------------------------
 -- Event response / handling
 local function handleEvent(self, event, ...)
+	
 	if doEventSpam == true then
 		print( colors.cyan .. addonName .. " caught event: " .. colors.red .. event)
 		local varArgs = {...}
@@ -116,7 +128,7 @@ local function handleEvent(self, event, ...)
 		end
 	end
 	
-	if event == hookedEvents.e_zoneChange[1] then
+	if event == hookedEvents.e_zoneChange then
 		local cont = au_getPMapInfos()[1];
 		local zone = au_getPMapInfos()[2];
 		if doEventSpam then
@@ -225,7 +237,7 @@ local function slashHandler(msg)
 
 	if cmd == 'listhooks' then
 		for k, v in pairs( hookedEvents ) do
-			print( colors.red, v[1] )
+			print( colors.red, v )
 		end
 	elseif cmd == "dfunc" then
 		runDebugFunction()
