@@ -5,7 +5,7 @@
 local addonName = ...
 local rainbowName = "|cFF9400D3A|r|cFF4B0082v|r|cFFEE1289A|r|cFF00FF00d|r|cFFFFFF00d|r|cFFFF7F00o|r|cFFFF0000n|r"
 local doEventSpam = false
-local verboseErrors = false
+local doVerboseErrors = false
 local isAddonLoaded = false
 local inCombat = false
 
@@ -210,8 +210,8 @@ local function catchEvent(self, event, ...)
 	end
 	
 	
-	-- Call the relevant event handler function if defined, else throw error (if verboseErrors enabled)
-	if (hookedEvents[event] == nil or hookedEvents[event](unpack({...})) == nil) and verboseErrors then
+	-- Call the relevant event handler function if defined, else throw error (if doVerboseErrors enabled)
+	if (hookedEvents[event] == nil or hookedEvents[event](unpack({...})) == nil) and doVerboseErrors then
 		local errString = (color.red.."DataHoarder:: No event handler for:\n"..color.orange..event)
 		print(errString)
 		error(errString)
@@ -224,22 +224,70 @@ DHFrame:SetScript("OnEvent", catchEvent)
 
 
 
--- Slash CMD function implementations
--- dbInsert
-local function dbInsert(indata)
-	table.insert(DataHoarderDB, indata)
-end
+-----------------------------
+-- -- SlashCMD Handling -- --
+-----------------------------
+
+-- Required WoW API globals for /command variants
+SLASH_AVADDON1, SLASH_AVADDON2 = '/ava', '/avaddon';
 
 
--- dbDump
-local function dbDump()
+
+-- -- SlashCMD implementations
+local slashCommands = {}
+
+slashCommands.listhooks = {
+	func = function(...)
+	print(" ")
+	print(rainbowName.." hooked events: ")
+	for k, v in pairs( hookedEvents ) do
+		print( color.red, k )
+	end
+	end,
+	
+	desc = "Lists all registered events"
+}
+
+slashCommands.dbdefaults = {
+	func = function(...)
+	dbLoadDefaults()
+	end,
+	
+	desc = "Initializes db structure"	
+}
+
+slashCommands.dbwipe = {
+	func = function(...)
+	wipe(DataHoarderDB)
+	print(color.cyan.."DataHoarderDB"..color.red.." wiped.")
+	end,
+	
+	desc = "Wipes database clean, without deleting the actual db"
+}
+
+
+slashCommands.spam = {
+	func = function(...)
+	doEventSpam = not doEventSpam
+	if doEventSpam then
+		print(rainbowName..": Event spam "..color.red.."enabled")
+	else
+		print(rainbowName..": Event spam "..color.green.."disabled")
+	end
+	end,
+	
+	desc = "Toggles verbose reporting of events"	
+}
+
+
+slashCommands.dbdump = {
+	func = function(...)
 	if next(DataHoarderDB) == nil then
 		print("Nothing to dump, db empty")
 		do return end
 	end
 	print("\n")
 	print("DataHoarderDB contents:")
-	
 	
 	local function dumpTbl (tbl, indent)
 		local indent = indent or 0
@@ -255,87 +303,80 @@ local function dbDump()
 	end
 	
 	dumpTbl(DataHoarderDB)
-end
-
-
--- dbDelete
-local function dbDelete(deldata)
-	table.remove(DataHoarderDB, deldata)
-end
-
-
--- Horrible debug function that can do anything at any time
-local function runDebugFunction()
-	print(color.pink.. "Nope.")
-end
-
-
--- Slash CMDs
-SLASH_AVADDON1, SLASH_AVADDON2 = '/ava', '/avaddon';
-
-local function slashHandler(msg)
-	local slashList = {
-		"listhooks",
-		"dbInsert",
-		"dbDelete",
-		"dbDefaults",
-		"dbDump",
-		"dbWipe",
-		"dfunc   "..color.red.."--MAY DO ANYTHING, DEBUG FUNCTION",
-		"spam",
-		"verboseErrors"
-	}
+	end,
 	
+	desc = ("Print the "..color.red.."entire DataHoarder database for this character!")
+}
+
+
+slashCommands.dfunc = {
+	func = function(...)
+	print(color.pink.. "Nope.")
+	end,
+	
+	desc = ("Debug function - "..color.red.."MAY DO ANYTHING")
+}
+
+
+slashCommands.verboseerrors = {
+	func = function(...)
+	doVerboseErrors = not doVerboseErrors
+	if doVerboseErrors then
+		print(rainbowName..": Verbose error logging "..color.red.."enabled")
+	else
+		print(rainbowName..": Verbose error logging "..color.green.."disabled")
+	end
+	end,
+	
+	desc = "Toggles extra verbose error logging"
+}
+
+
+
+-- SlashCmd catcher/preprocessor
+local function slashHandler(msg)
+	
+	-- split the recieved slashCmd into a root command plus any extra arguments
 	local parts = {}
-	local cmd
+	local root
 	
 	for part in string.lower(msg):gmatch("%S+") do
 		table.insert(parts, part)
 	end
-
-	cmd = parts[1]
-
-	if cmd == 'listhooks' then
-		for k, v in pairs( hookedEvents ) do
-			print( color.red, v )
-		end
-	elseif cmd == "dfunc" then
-		runDebugFunction()
-	elseif cmd == "dbinsert" then
-		dbInsert(parts[2])
-	elseif cmd == "dbdump" then
-		dbDump()
-	elseif cmd == "dbdelete" then
-		if tonumber(parts[2]) then
-			dbDelete(parts[2])
-		else
-			print("Delete arg cannot be blank and must be a number")
-		end
-	elseif cmd == "dbdefaults" then
-		dbLoadDefaults()
-	elseif cmd == "dbwipe" then
-		wipe(DataHoarderDB)
-		print(color.cyan.."DataHoarderDB"..color.red.." wiped.")
-	elseif cmd == "spam" then
-		doEventSpam = not doEventSpam
-		if doEventSpam then
-			print(rainbowName..": Event spam "..color.red.."enabled")
-		else
-			print(rainbowName..": Event spam "..color.green.."disabled")
-		end
-	elseif cmd == "verboseerrors" then
-		verboseErrors = not verboseErrors
-		if verboseErrors then
-			print(rainbowName..": Verbose error logging "..color.red.."enabled")
-		else
-			print(rainbowName..": Verbose error logging "..color.green.."disabled")
-		end
-	else
+	
+	root = parts[1]
+	table.remove(parts, 1) --FIXME: Must be a better way to strip the first element of the table, or just handle the whole thing better
+	
+	
+	-- Utility function to print all available commands
+	local function printCmdList()
+		local slashListSeparator = "      `- "
+		
+		print(" ")
 		print(rainbowName.." commands:")
-		for k, v in pairs( slashList ) do
-			print( color.orange, v )
+		
+		for k, v in pairs(slashCommands) do
+			print(k)
+			if v.desc then
+				print(color.cyan..slashListSeparator..color.orange..v.desc)
+			else
+				print(slashListSeparator..color.red.."NoDesc")
+			end
 		end
 	end
+	
+	
+	-- Check if the root command exists, and call it. Else print error and list available commands + their description (if any)
+	if slashCommands[root] ~= nil then
+		slashCommands[root].func(unpack({parts}))
+	elseif root == nil then
+		printCmdList()
+	else
+		print(" ")
+		print(rainbowName.." unrecognized command: "..color.red..root)
+		print("List available commands with "..color.cyan.."/ava|r or "..color.cyan.."/avaddon")
+	end
 end
+
 
 SlashCmdList["AVADDON"] = slashHandler;
