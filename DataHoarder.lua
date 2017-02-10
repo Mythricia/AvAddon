@@ -5,6 +5,7 @@
 local addonName = ...
 local rainbowName = "|cFF9400D3A|r|cFF4B0082v|r|cFFEE1289A|r|cFF00FF00d|r|cFFFFFF00d|r|cFFFF7F00o|r|cFFFF0000n|r"
 local doEventSpam = false
+local verboseErrors = false
 local isAddonLoaded = false
 local inCombat = false
 
@@ -17,6 +18,9 @@ DataHoarderDB = DataHoarderDB or {}
 -- Common lua:
 local table_insert = table.insert;
 local type = type;
+local pairs = pairs
+local ipairs = ipairs
+local _G = _G
 local string_len = string.len;
 local string_sub = string.sub;
 local string_gsub = string.gsub;
@@ -108,6 +112,8 @@ local hookedEvents = {}
 
 -- Zone change, collect continent and zone information and count number of visits
 function hookedEvents.ZONE_CHANGED_NEW_AREA(...)
+	
+	print(...)
 	local cont = au_getPMapInfos()[1];
 	local zone = au_getPMapInfos()[2];
 	if doEventSpam then
@@ -196,17 +202,16 @@ end
 local function catchEvent(self, event, ...)
 	
 	-- Check if we should enable verbose output
-	if doEventSpam == true then
+	if doEventSpam then
 		print( color.cyan .. addonName .. " caught event: " .. color.red .. event)
-		local varArgs = {...}
-		for k, v in pairs( varArgs ) do
+		for k, v in pairs( {...} ) do
 			print( color.cyan, k, color.red, v )
 		end
 	end
 	
 	
-	-- Call the relevant event handler function, if defined
-	if (hookedEvents[event] == nil) or (hookedEvents[event]() == nil) then
+	-- Call the relevant event handler function if defined, else throw error (if verboseErrors enabled)
+	if (hookedEvents[event] == nil or hookedEvents[event](unpack({...})) == nil) and verboseErrors then
 		local errString = (color.red.."DataHoarder:: No event handler for:\n"..color.orange..event)
 		print(errString)
 		error(errString)
@@ -225,6 +230,7 @@ local function dbInsert(indata)
 	table.insert(DataHoarderDB, indata)
 end
 
+
 -- dbDump
 local function dbDump()
 	if next(DataHoarderDB) == nil then
@@ -233,15 +239,30 @@ local function dbDump()
 	end
 	print("\n")
 	print("DataHoarderDB contents:")
-	for k, v in pairs( DataHoarderDB ) do
-		print( k, color.cyan, v )
+	
+	
+	local function dumpTbl (tbl, indent)
+		local indent = indent or 0
+		for k, v in pairs(tbl) do
+			formatting = string.rep(color.purple .. "| - - ", indent) .. color.teal .. tostring(k)
+			if type(v) == "table" then
+				print(formatting .. color.green .. " +")
+				dumpTbl(v, indent+1)
+			else
+				print(formatting .. ": " .. color.cyan .. tostring(v))
+			end
+		end
 	end
+	
+	dumpTbl(DataHoarderDB)
 end
+
 
 -- dbDelete
 local function dbDelete(deldata)
 	table.remove(DataHoarderDB, deldata)
 end
+
 
 -- Horrible debug function that can do anything at any time
 local function runDebugFunction()
@@ -262,6 +283,7 @@ local function slashHandler(msg)
 		"dbWipe",
 		"dfunc   "..color.red.."--MAY DO ANYTHING, DEBUG FUNCTION",
 		"spam",
+		"verboseErrors"
 	}
 	
 	local parts = {}
@@ -300,6 +322,13 @@ local function slashHandler(msg)
 			print(rainbowName..": Event spam "..color.red.."enabled")
 		else
 			print(rainbowName..": Event spam "..color.green.."disabled")
+		end
+	elseif cmd == "verboseerrors" then
+		verboseErrors = not verboseErrors
+		if verboseErrors then
+			print(rainbowName..": Verbose error logging "..color.red.."enabled")
+		else
+			print(rainbowName..": Verbose error logging "..color.green.."disabled")
 		end
 	else
 		print(rainbowName.." commands:")
