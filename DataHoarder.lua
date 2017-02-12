@@ -55,13 +55,24 @@ local function dbLoadDefaults()
 -- This wipes the table but keeps all references to it intact
 wipe(DataHoarderDB)
 
-DataHoarderDB.Character = UnitName("player")
-DataHoarderDB.LastContinent = ""
-DataHoarderDB.LastZone = ""
-DataHoarderDB.ContinentsVisited = 0;
-DataHoarderDB.ZonesVisited = 0;
-DataHoarderDB.Continents = {};
-DataHoarderDB.DPS = 0;
+DataHoarderDB.Character 		= UnitName("player")
+DataHoarderDB.LastContinent 	= ""
+DataHoarderDB.LastZone 			= ""
+DataHoarderDB.ContinentsVisited = 0
+DataHoarderDB.ZonesVisited 		= 0
+DataHoarderDB.Continents 		= {}
+DataHoarderDB.LevelData			= {}
+--[[
+	1 = {
+		
+		Played = --- timePlayed, synced with the in-game current level /played statistic on login & logout, if possible
+		AFKTime= --- timeWhileAFK
+		Active = --- timePlayed - timeAFK
+		AvgDPS = --- averageDPSThroughLevel
+		
+	}	
+}
+]]
 end
 
 
@@ -113,7 +124,6 @@ local hookedEvents = {}
 -- Zone change, collect continent and zone information and count number of visits
 function hookedEvents.ZONE_CHANGED_NEW_AREA(...)
 	
-	print(...)
 	local cont = au_getPMapInfos()[1];
 	local zone = au_getPMapInfos()[2];
 	if doEventSpam then
@@ -162,26 +172,67 @@ end
 
 
 
+-- log current level on login, if it's not already in the db
 hookedEvents.PLAYER_ENTERING_WORLD = function(...)
---- handle this event
+
+if not DataHoarderDB.LevelData then
+	DataHoarderDB.LevelData = {}
+end
+
+if not (DataHoarderDB.LevelData[UnitLevel("player")]) then
+	DataHoarderDB.LevelData[UnitLevel("player")] = {}
+end
+
+end
+
+
+
+-- Log the new level when the player levels up
+-- The level returned in event arg 1 is more accurate than UnitLevel("player") at this instant!
+hookedEvents.PLAYER_LEVEL_UP = function(...)
+local level, hp, mp, talentPoints, str, agi, stam, int, spirit = ...
+
+if doEventSpam then
+	print( "Player leveled up, new level is " .. varArgs[1] )
+	print( "Gained "..varArgs[2].."HP")
+	print( "Gained ".. varArgs[3] .."Mana")
+end
+
+-- Create DB entry for the new level
+-- TODO: Panic if the level entry already exists, or do we not care? Check if it's empty before overwrite?
+if not DataHoarderDB.LevelData then
+	DataHoarderDB.LevelData = {}
+end
+
+if not (DataHoarderDB.LevelData[level]) then
+	DataHoarderDB.LevelData[level] = {}
+end
+
 end
 
 
 
 hookedEvents.COMBAT_LOG_EVENT_UNFILTERED = function(...)
---- handle this event
+-- handle this event
+-- This is hilarious: print(select(select('#', ...)-3,...))
 end
 
 
 
 hookedEvents.PLAYER_REGEN_DISABLED = function(...)
---- handle this event
+
+-- We're in combat, set state and log enter timestamp
+inCombat = true
+
 end
 
 
 
 hookedEvents.PLAYER_REGEN_ENABLED = function(...)
---- handle this event
+
+-- We're out of combat, unset state and log exit timestamp
+inCombat = false
+
 end
 
 ----------------------END----------------------
