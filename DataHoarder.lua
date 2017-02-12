@@ -179,7 +179,7 @@ if not DataHoarderDB.LevelData then
 	DataHoarderDB.LevelData = {}
 end
 
-if not (DataHoarderDB.LevelData[UnitLevel("player")]) then
+if not DataHoarderDB.LevelData[UnitLevel("player")] then
 	DataHoarderDB.LevelData[UnitLevel("player")] = {}
 end
 
@@ -204,7 +204,7 @@ if not DataHoarderDB.LevelData then
 	DataHoarderDB.LevelData = {}
 end
 
-if not (DataHoarderDB.LevelData[level]) then
+if not DataHoarderDB.LevelData[level] then
 	DataHoarderDB.LevelData[level] = {}
 end
 
