@@ -33,7 +33,7 @@ local au_getPMapInfos = AvUtil_GetPlayerMapInfos;	-- {contName, zone, subzone}
 local au_strFmt = AvUtil_FormatDecimalString;
 
 
--- Pretty colors
+-- Pretty colortags
 local cTag = "|cFF"	-- Separate the tag and Alpha (always FF) from the actual hex color definitions
 local color = {
 	red 	= cTag.."FF0000",
@@ -191,6 +191,7 @@ end
 -- The level returned in event arg 1 is more accurate than UnitLevel("player") at this instant!
 hookedEvents.PLAYER_LEVEL_UP = function(...)
 local level, hp, mp, talentPoints, str, agi, stam, int, spirit = ...
+local lastLevel = max(tonumber(level)-1, 1)
 
 if doEventSpam then
 	print( "Player leveled up, new level is " .. varArgs[1] )
@@ -208,13 +209,76 @@ if not DataHoarderDB.LevelData[level] then
 	DataHoarderDB.LevelData[level] = {}
 end
 
+
+-- Go back and set the ExitTime for the previous level. Safeguard in case last level was actually level 1
+DataHoarderDB.LevelData[lastLevel].ExitTime = time()
+
+-- Set the EntryTime for the level we just became
+DataHoarderDB.LevelData[level].EntryTime = time()
+
+-- TODO: Remove?
+-- And for the heck of it, calculate the time we spent in the last level
+local lastLevelTime = DataHoarderDB.LevelData[lastLevel].ExitTime - (DataHoarderDB.LevelData[lastLevel].EntryTime or 0)
+print (color.pink.."Last level took "..tostring(lastLevelTime).." seconds. Or, better put: "..SecondsToTime(lastLevelTime, false, false, 3))
+
+-- Calculate the average DPS for the last level
+local averageDPS = DataHoarderDB.LevelData[lastLevel].DamageTotal / lastLevelTime
+DataHoarderDB.LevelData[lastLevel].AvgDPS = averageDPS
+print(color.pink.."During the previous level, you did an average of "..averageDPS.." Damage Per Second!")
+
+
 end
 
 
 
 hookedEvents.COMBAT_LOG_EVENT_UNFILTERED = function(...)
--- handle this event
--- This is hilarious: print(select(select('#', ...)-3,...))
+
+if inCombat then
+	local player = UnitName("player")
+
+-- Cache the first 11 args, since they will always appear
+local baseArgs = {}
+baseArgs.timeStamp, baseArgs.eventType, baseArgs.hideCaster,
+baseArgs.sourceGUID, baseArgs.sourceName, baseArgs.sourceFlags,
+baseArgs.sourceRaidFlags, baseArgs.destGUID, baseArgs.destName,
+baseArgs.destFlags, baseArgs.destRaidFlags = ...;
+
+-- Cache all remaining args
+local extraArgs = {select(12,...)}
+
+-- Check if we're dealing with Spell or Ranged damage first, since both share argument structure
+if (baseArgs.eventType == "SPELL_DAMAGE") or (baseArgs.eventType == "RANGE_DAMAGE") then
+
+-- It's spell or ranged, so parameters are 12(spellID), 13(spellName), 14(spellSchool), the rest (15th onwards) are damage details
+local spellID, spellName, spellSchool = unpack(extraArgs)
+
+local amount, overkill, school, resisted,
+blocked, absorbed, critical, glancing,
+crushing, isOffHand = unpack(extraArgs, 4)
+
+-- Do something with it
+if baseArgs.sourceName == player then
+	DataHoarderDB.LevelData[UnitLevel("player")].DamageTotal = (DataHoarderDB.LevelData[UnitLevel("player")].DamageTotal or 0) + amount
+end
+
+
+-- Check if we're dealing with a melee swing
+elseif baseArgs.eventType == "SWING_DAMAGE" then
+
+-- It's melee, no prefix parameters, all extra args are damage details
+local amount, overkill, school, resisted,
+blocked, absorbed, critical, glancing,
+crushing, isOffHand = unpack(extraArgs)
+
+-- Do something with it
+if baseArgs.sourceName == player then
+	DataHoarderDB.LevelData[UnitLevel("player")].DamageTotal = (DataHoarderDB.LevelData[UnitLevel("player")].DamageTotal or 0) + amount
+end
+
+end
+
+
+end
 end
 
 
