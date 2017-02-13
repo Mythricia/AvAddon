@@ -8,6 +8,8 @@ local doEventSpam = false
 local doVerboseErrors = false
 local isAddonLoaded = false
 local inCombat = false
+local combatTimeTracker = {["start"]=0,["stop"]=0}
+local currentPlayerLevel = 0
 
 
 -- This shouldn't be here, but it's here, so that I don't get a nil error when initializing DB later...
@@ -69,6 +71,7 @@ DataHoarderDB.LevelData			= {}
 		AFKTime= --- timeWhileAFK
 		Active = --- timePlayed - timeAFK
 		AvgDPS = --- averageDPSThroughLevel
+		CombatTime = --- Rolling total time _in combat_
 		
 	}	
 }
@@ -174,14 +177,21 @@ end
 
 -- log current level on login, if it's not already in the db
 hookedEvents.PLAYER_ENTERING_WORLD = function(...)
+currentPlayerLevel = UnitLevel("player")
 
 if not DataHoarderDB.LevelData then
 	DataHoarderDB.LevelData = {}
 end
 
-if not DataHoarderDB.LevelData[UnitLevel("player")] then
-	DataHoarderDB.LevelData[UnitLevel("player")] = {}
+if not DataHoarderDB.LevelData[currentPlayerLevel] then
+	DataHoarderDB.LevelData[currentPlayerLevel] = {}
 end
+
+if not DataHoarderDB.LevelData[currentPlayerLevel].EntryTime then
+	DataHoarderDB.LevelData[currentPlayerLevel].EntryTime = time()
+end
+
+
 
 end
 
@@ -191,7 +201,12 @@ end
 -- The level returned in event arg 1 is more accurate than UnitLevel("player") at this instant!
 hookedEvents.PLAYER_LEVEL_UP = function(...)
 local level, hp, mp, talentPoints, str, agi, stam, int, spirit = ...
+
+-- Safeguard in case last level was actually level 1
 local lastLevel = max(tonumber(level)-1, 1)
+
+-- Update the local level variable right away, since UnitLevel("player") is inaccurate at this instant
+currentPlayerLevel = level
 
 if doEventSpam then
 	print( "Player leveled up, new level is " .. varArgs[1] )
@@ -210,22 +225,23 @@ if not DataHoarderDB.LevelData[level] then
 end
 
 
--- Go back and set the ExitTime for the previous level. Safeguard in case last level was actually level 1
+-- Go back and set the ExitTime for the previous level
 DataHoarderDB.LevelData[lastLevel].ExitTime = time()
 
 -- Set the EntryTime for the level we just became
 DataHoarderDB.LevelData[level].EntryTime = time()
 
--- TODO: Remove?
--- And for the heck of it, calculate the time we spent in the last level
+-- FIXME: Currently represents REAL WORLD TIME; not /played time or anything contextual. 
+-- calculate the time we spent in the last level, safeguard in case last level is missing db entry
 local lastLevelTime = DataHoarderDB.LevelData[lastLevel].ExitTime - (DataHoarderDB.LevelData[lastLevel].EntryTime or 0)
-print (color.pink.."Last level took "..tostring(lastLevelTime).." seconds. Or, better put: "..SecondsToTime(lastLevelTime, false, false, 3))
+print (color.pink.."Last level took "..SecondsToTime(lastLevelTime, false, false, 6))
 
 -- Calculate the average DPS for the last level
-local averageDPS = DataHoarderDB.LevelData[lastLevel].DamageTotal / lastLevelTime
+local averageDPS = DataHoarderDB.LevelData[lastLevel].DamageTotal / DataHoarderDB.LevelData[lastLevel].CombatTime
+local combatTime = DataHoarderDB.LevelData[lastLevel].CombatTime
 DataHoarderDB.LevelData[lastLevel].AvgDPS = averageDPS
-print(color.pink.."During the previous level, you did an average of "..averageDPS.." Damage Per Second!")
 
+print(color.pink.."During the previous level, you spent "..SecondsToTime(combatTime, false, false, 6).." in combat, and did an average of "..au_strFmt(averageDPS, 0).." Damage Per Second!")
 
 end
 
@@ -256,9 +272,9 @@ local amount, overkill, school, resisted,
 blocked, absorbed, critical, glancing,
 crushing, isOffHand = unpack(extraArgs, 4)
 
--- Do something with it
-if baseArgs.sourceName == player then
-	DataHoarderDB.LevelData[UnitLevel("player")].DamageTotal = (DataHoarderDB.LevelData[UnitLevel("player")].DamageTotal or 0) + amount
+-- Check if the source is the Player, or a Player controlled Pet (flag 0x1111, decimal 4369), and do something with it
+if (baseArgs.sourceName == player) or (baseArgs.sourceFlags == 4369) then
+	DataHoarderDB.LevelData[currentPlayerLevel].DamageTotal = (DataHoarderDB.LevelData[currentPlayerLevel].DamageTotal or 0) + amount
 end
 
 
@@ -270,9 +286,9 @@ local amount, overkill, school, resisted,
 blocked, absorbed, critical, glancing,
 crushing, isOffHand = unpack(extraArgs)
 
--- Do something with it
-if baseArgs.sourceName == player then
-	DataHoarderDB.LevelData[UnitLevel("player")].DamageTotal = (DataHoarderDB.LevelData[UnitLevel("player")].DamageTotal or 0) + amount
+-- Check if the source is the Player, or a Player controlled Pet (flag 0x1111, decimal 4369), and do something with it
+if (baseArgs.sourceName == player) or (baseArgs.sourceFlags == 4369) then
+	DataHoarderDB.LevelData[currentPlayerLevel].DamageTotal = (DataHoarderDB.LevelData[currentPlayerLevel].DamageTotal or 0) + amount
 end
 
 end
@@ -287,6 +303,8 @@ hookedEvents.PLAYER_REGEN_DISABLED = function(...)
 
 -- We're in combat, set state and log enter timestamp
 inCombat = true
+combatTimeTracker.start = GetTime()
+
 
 end
 
@@ -296,6 +314,9 @@ hookedEvents.PLAYER_REGEN_ENABLED = function(...)
 
 -- We're out of combat, unset state and log exit timestamp
 inCombat = false
+combatTimeTracker.stop = GetTime()
+
+DataHoarderDB.LevelData[currentPlayerLevel].CombatTime = (DataHoarderDB.LevelData[currentPlayerLevel].CombatTime or 0) + (combatTimeTracker.stop - combatTimeTracker.start)
 
 end
 
