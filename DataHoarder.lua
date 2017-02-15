@@ -179,81 +179,77 @@ end
 
 
 -- log current level on login, if it's not already in the db
-hookedEvents.PLAYER_ENTERING_WORLD = function(...)
-currentPlayerLevel = UnitLevel("player")
+function hookedEvents.PLAYER_ENTERING_WORLD(...)
+	currentPlayerLevel = UnitLevel("player")
 
-if not DataHoarderDB.LevelData then
-	DataHoarderDB.LevelData = {}
-end
+	if not DataHoarderDB.LevelData then
+		DataHoarderDB.LevelData = {}
+	end
 
-if not DataHoarderDB.LevelData[currentPlayerLevel] then
-	DataHoarderDB.LevelData[currentPlayerLevel] = {}
-end
+	if not DataHoarderDB.LevelData[currentPlayerLevel] then
+		DataHoarderDB.LevelData[currentPlayerLevel] = {}
+	end
 
-if not DataHoarderDB.LevelData[currentPlayerLevel].EntryTime then
-	DataHoarderDB.LevelData[currentPlayerLevel].EntryTime = time()
-end
-
-
-
+	if not DataHoarderDB.LevelData[currentPlayerLevel].EntryTime then
+		DataHoarderDB.LevelData[currentPlayerLevel].EntryTime = time()
+	end
 end
 
 
 
 -- Log the new level when the player levels up
 -- The level returned in event arg 1 is more accurate than UnitLevel("player") at this instant!
-hookedEvents.PLAYER_LEVEL_UP = function(...)
-local level, hp, mp, talentPoints, str, agi, stam, int, spirit = ...
+function hookedEvents.PLAYER_LEVEL_UP(...)
+	local level, hp, mp, talentPoints, str, agi, stam, int, spirit = ...
 
--- Safeguard in case last level was actually level 1
-local lastLevel = max(tonumber(level)-1, 1)
-
--- Update the local level variable right away, since UnitLevel("player") is inaccurate at this instant
-currentPlayerLevel = level
-
-if doEventSpam then
-	print( "Player leveled up, new level is " .. varArgs[1] )
-	print( "Gained "..varArgs[2].."HP")
-	print( "Gained ".. varArgs[3] .."Mana")
-end
-
--- Create DB entry for the new level
--- TODO: Panic if the level entry already exists, or do we not care? Check if it's empty before overwrite?
-if not DataHoarderDB.LevelData then
-	DataHoarderDB.LevelData = {}
-end
-
-if not DataHoarderDB.LevelData[level] then
-	DataHoarderDB.LevelData[level] = {}
-end
-
-
--- Go back and set the ExitTime for the previous level
-DataHoarderDB.LevelData[lastLevel].ExitTime = time()
-
--- Set the EntryTime for the level we just became
-DataHoarderDB.LevelData[level].EntryTime = time()
-
--- FIXME: Currently represents REAL WORLD TIME; not /played time or anything contextual. 
--- calculate the time we spent in the last level, safeguard in case last level is missing db entry
-local lastLevelTime = DataHoarderDB.LevelData[lastLevel].ExitTime - (DataHoarderDB.LevelData[lastLevel].EntryTime or 0)
-print (color.pink.."Last level took "..SecondsToTime(lastLevelTime, false, false, 6))
-
--- Calculate the average DPS for the last level
-local averageDPS = DataHoarderDB.LevelData[lastLevel].DamageTotal / DataHoarderDB.LevelData[lastLevel].CombatTime
-local combatTime = DataHoarderDB.LevelData[lastLevel].CombatTime
-DataHoarderDB.LevelData[lastLevel].AvgDPS = averageDPS
-
-print(color.pink.."During the previous level, you spent "..SecondsToTime(combatTime, false, false, 6).." in combat, and did an average of "..au_strFmt(averageDPS, 0).." Damage Per Second!")
-
-end
-
-
-
-hookedEvents.COMBAT_LOG_EVENT_UNFILTERED = function(...)
-if inCombat then
-	local player = UnitName("player")
+	-- Safeguard in case last level was actually level 1
+	local lastLevel = max(tonumber(level)-1, 1)
 	
+	-- Update the local level variable right away, since UnitLevel("player") is inaccurate at this instant
+	currentPlayerLevel = level
+	
+	if doEventSpam then
+		print( "Player leveled up, new level is " .. varArgs[1] )
+		print( "Gained "..varArgs[2].."HP")
+		print( "Gained ".. varArgs[3] .."Mana")
+	end
+	
+	-- Create DB entry for the new level
+	-- TODO: Panic if the level entry already exists, or do we not care? Check if it's empty before overwrite?
+	if not DataHoarderDB.LevelData then
+		DataHoarderDB.LevelData = {}
+	end
+	
+	if not DataHoarderDB.LevelData[level] then
+		DataHoarderDB.LevelData[level] = {}
+	end
+	
+	
+	-- Go back and set the ExitTime for the previous level
+	DataHoarderDB.LevelData[lastLevel].ExitTime = time()
+	
+	-- Set the EntryTime for the level we just became
+	DataHoarderDB.LevelData[level].EntryTime = time()
+	
+	-- FIXME: Currently represents REAL WORLD TIME; not /played time or anything contextual. 
+	-- calculate the time we spent in the last level, safeguard in case last level is missing db entry
+	local lastLevelTime = DataHoarderDB.LevelData[lastLevel].ExitTime - (DataHoarderDB.LevelData[lastLevel].EntryTime or 0)
+	print (color.pink.."Last level took "..SecondsToTime(lastLevelTime, false, false, 6))
+	
+	-- Calculate the average DPS for the last level
+	local averageDPS = DataHoarderDB.LevelData[lastLevel].DamageTotal / DataHoarderDB.LevelData[lastLevel].CombatTime
+	local combatTime = DataHoarderDB.LevelData[lastLevel].CombatTime
+	DataHoarderDB.LevelData[lastLevel].AvgDPS = averageDPS
+	
+	print(color.pink.."During the previous level, you spent "..SecondsToTime(combatTime, false, false, 6).." in combat, and did an average of "..au_strFmt(averageDPS, 0).." Damage Per Second!")
+end
+
+
+
+function hookedEvents.COMBAT_LOG_EVENT_UNFILTERED(...)
+	if inCombat then
+		local player = UnitName("player")
+		
 		-- Cache the first 11 args, since they will always appear
 		local timeStamp, eventType, hideCaster, sourceGUID, sourceName, sourceFlags,
 		sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags = ...
@@ -287,30 +283,28 @@ end
 
 
 
-hookedEvents.PLAYER_REGEN_DISABLED = function(...)
-
--- We're in combat, set state and log enter timestamp
-combatTimeTracker.start = GetTime()
-combatDamage = 0
-inCombat = true
-
+function hookedEvents.PLAYER_REGEN_DISABLED(...)
+	
+	-- We're in combat, set state and log enter timestamp
+	combatTimeTracker.start = GetTime()
+	combatDamage = 0
+	inCombat = true	
 end
 
 
 
-hookedEvents.PLAYER_REGEN_ENABLED = function(...)
-
--- We're out of combat, unset state and log exit timestamp
-combatTimeTracker.stop = GetTime()
-inCombat = false
-
-DataHoarderDB.LevelData[currentPlayerLevel].CombatTime = (DataHoarderDB.LevelData[currentPlayerLevel].CombatTime or 0) + (combatTimeTracker.stop - combatTimeTracker.start)
-
-DataHoarderDB.LevelData[currentPlayerLevel].DamageTotal = (DataHoarderDB.LevelData[currentPlayerLevel].DamageTotal or 0) + combatDamage
-print(color.red.."DBDH:: Added "..tostring(combatDamage).." damage to totals.")
-
-combatDamage = 0
-
+function hookedEvents.PLAYER_REGEN_ENABLED(...)
+	
+	-- We're out of combat, unset state and log exit timestamp
+	combatTimeTracker.stop = GetTime()
+	inCombat = false
+	
+	DataHoarderDB.LevelData[currentPlayerLevel].CombatTime = (DataHoarderDB.LevelData[currentPlayerLevel].CombatTime or 0) + (combatTimeTracker.stop - combatTimeTracker.start)
+	
+	DataHoarderDB.LevelData[currentPlayerLevel].DamageTotal = (DataHoarderDB.LevelData[currentPlayerLevel].DamageTotal or 0) + combatDamage
+	print(color.red.."DBDH:: Added "..tostring(combatDamage).." damage to totals.")
+	
+	combatDamage = 0	
 end
 
 ----------------------END----------------------
