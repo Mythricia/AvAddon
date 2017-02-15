@@ -11,6 +11,9 @@ local inCombat = false
 local combatTimeTracker = {["start"]=0,["stop"]=0}
 local currentPlayerLevel = 0
 
+-- Debug, damage logging accumulator
+local combatDamage = 0
+
 
 -- This shouldn't be here, but it's here, so that I don't get a nil error when initializing DB later...
 DataHoarderDB = DataHoarderDB or {}
@@ -35,7 +38,7 @@ local au_getPMapInfos = AvUtil_GetPlayerMapInfos;	-- {contName, zone, subzone}
 local au_strFmt = AvUtil_FormatDecimalString;
 
 
--- Pretty colortags
+-- Pretty color tags
 local cTag = "|cFF"	-- Separate the tag and Alpha (always FF) from the actual hex color definitions
 local color = {
 	red 	= cTag.."FF0000",
@@ -248,53 +251,38 @@ end
 
 
 hookedEvents.COMBAT_LOG_EVENT_UNFILTERED = function(...)
-
 if inCombat then
 	local player = UnitName("player")
+	
+		-- Cache the first 11 args, since they will always appear
+		local timeStamp, eventType, hideCaster, sourceGUID, sourceName, sourceFlags,
+		sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags = ...
+		
+		if (sourceName == player) or (sourceFlags == 4369) then
+			
+			-- Check if we're dealing with Spell or Ranged damage first, since both share argument structure
+			if (eventType == "SPELL_DAMAGE") or (eventType == "RANGE_DAMAGE") or (eventType == "SPELL_PERIODIC_DAMAGE") then
+				
+				-- It's spell or ranged, so parameters are 12(spellID), 13(spellName), 14(spellSchool), the rest (15th onwards) are damage details
+				local spellId, spellName, spellSchool, amount, 
+				overkill, school, resisted, blocked, absorbed,
+				critical, glancing, crushing = select(12, ...)
+				
+				-- Increment the damage accumulator
+				combatDamage = combatDamage + amount
+				
+			-- Check if we're dealing with a melee swing
+		elseif eventType == "SWING_DAMAGE" then
+			
+				-- It's melee, no prefix parameters, all extra args are damage details
+				local amount, overkill, school, resisted,
+				blocked, absorbed, critical, glancing, crushing = select(12, ...)
 
--- Cache the first 11 args, since they will always appear
-local baseArgs = {}
-baseArgs.timeStamp, baseArgs.eventType, baseArgs.hideCaster,
-baseArgs.sourceGUID, baseArgs.sourceName, baseArgs.sourceFlags,
-baseArgs.sourceRaidFlags, baseArgs.destGUID, baseArgs.destName,
-baseArgs.destFlags, baseArgs.destRaidFlags = ...;
-
--- Cache all remaining args
-local extraArgs = {select(12,...)}
-
--- Check if we're dealing with Spell or Ranged damage first, since both share argument structure
-if (baseArgs.eventType == "SPELL_DAMAGE") or (baseArgs.eventType == "RANGE_DAMAGE") then
-
--- It's spell or ranged, so parameters are 12(spellID), 13(spellName), 14(spellSchool), the rest (15th onwards) are damage details
-local spellID, spellName, spellSchool = unpack(extraArgs)
-
-local amount, overkill, school, resisted,
-blocked, absorbed, critical, glancing,
-crushing, isOffHand = unpack(extraArgs, 4)
-
--- Check if the source is the Player, or a Player controlled Pet (flag 0x1111, decimal 4369), and do something with it
-if (baseArgs.sourceName == player) or (baseArgs.sourceFlags == 4369) then
-	DataHoarderDB.LevelData[currentPlayerLevel].DamageTotal = (DataHoarderDB.LevelData[currentPlayerLevel].DamageTotal or 0) + amount
-end
-
-
--- Check if we're dealing with a melee swing
-elseif baseArgs.eventType == "SWING_DAMAGE" then
-
--- It's melee, no prefix parameters, all extra args are damage details
-local amount, overkill, school, resisted,
-blocked, absorbed, critical, glancing,
-crushing, isOffHand = unpack(extraArgs)
-
--- Check if the source is the Player, or a Player controlled Pet (flag 0x1111, decimal 4369), and do something with it
-if (baseArgs.sourceName == player) or (baseArgs.sourceFlags == 4369) then
-	DataHoarderDB.LevelData[currentPlayerLevel].DamageTotal = (DataHoarderDB.LevelData[currentPlayerLevel].DamageTotal or 0) + amount
-end
-
-end
-
-
-end
+				-- Increment the damage accumulator
+				combatDamage = combatDamage + amount
+			end
+		end
+	end
 end
 
 
@@ -302,9 +290,9 @@ end
 hookedEvents.PLAYER_REGEN_DISABLED = function(...)
 
 -- We're in combat, set state and log enter timestamp
-inCombat = true
 combatTimeTracker.start = GetTime()
-
+combatDamage = 0
+inCombat = true
 
 end
 
@@ -313,10 +301,15 @@ end
 hookedEvents.PLAYER_REGEN_ENABLED = function(...)
 
 -- We're out of combat, unset state and log exit timestamp
-inCombat = false
 combatTimeTracker.stop = GetTime()
+inCombat = false
 
 DataHoarderDB.LevelData[currentPlayerLevel].CombatTime = (DataHoarderDB.LevelData[currentPlayerLevel].CombatTime or 0) + (combatTimeTracker.stop - combatTimeTracker.start)
+
+DataHoarderDB.LevelData[currentPlayerLevel].DamageTotal = (DataHoarderDB.LevelData[currentPlayerLevel].DamageTotal or 0) + combatDamage
+print(color.red.."DBDH:: Added "..tostring(combatDamage).." damage to totals.")
+
+combatDamage = 0
 
 end
 
