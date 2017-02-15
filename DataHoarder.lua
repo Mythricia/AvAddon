@@ -308,7 +308,6 @@ function hookedEvents.PLAYER_REGEN_ENABLED(...)
 end
 
 ----------------------END----------------------
--- -- Individual event handling functions -- --
 -----------------------------------------------
 
 
@@ -371,13 +370,6 @@ slashCommands.listhooks = {
 	desc = "Lists all registered events"
 }
 
-slashCommands.dbdefaults = {
-	func = function(...)
-	dbLoadDefaults()
-	end,
-	
-	desc = "Initializes db structure"	
-}
 
 slashCommands.dbwipe = {
 	func = function(...)
@@ -456,6 +448,58 @@ slashCommands.verboseerrors = {
 
 
 
+slashCommands.wipelevel = {
+	func = function(...)
+	local targLevel = ...
+	
+	if targLevel == nil then targLevel = currentPlayerLevel end
+	
+	if DataHoarderDB.LevelData[targLevel] then
+		DataHoarderDB.LevelData[targLevel] = nil
+		DataHoarderDB.LevelData[targLevel] = {}
+	end
+	end,
+	
+	desc = "Wipe db records for the specified level"
+}
+
+
+slashCommands.dumplevel = {
+	func = function(...)
+	
+	local dmpLevel = ...
+	
+	if dmpLevel == nil then
+		dmpLevel = currentPlayerLevel
+		
+		print("\n")
+		print("LevelData for level "..dmpLevel..":")
+		
+		local function dumpTbl (tbl, indent)
+			local indent = indent or 0
+			for k, v in pairs(tbl) do
+				formatting = string.rep(color.purple .. "| - - ", indent) .. color.teal .. tostring(k)
+				if type(v) == "table" then
+					print(formatting .. color.green .. " +")
+					dumpTbl(v, indent+1)
+				else
+					print(formatting .. ": " .. color.cyan .. tostring(v))
+				end
+			end
+		end		
+		dumpTbl(DataHoarderDB.LevelData[dmpLevel])
+		
+	elseif not DataHoarderDB.LevelData[dmpLevel] then
+		print( color.red.."Not a valid level: |r"..dmpLevel )
+		do return end
+	end
+	end,
+
+	desc = "Dump the LevelData for this level only (defaults to current level)"
+}
+
+
+
 -- SlashCmd catcher/preprocessor
 local function slashHandler(msg)
 	
@@ -491,7 +535,7 @@ local function slashHandler(msg)
 	
 	-- Check if the root command exists, and call it. Else print error and list available commands + their description (if any)
 	if slashCommands[root] ~= nil then
-		slashCommands[root].func(unpack({parts}))
+		slashCommands[root].func(unpack(parts))
 	elseif root == nil then
 		printCmdList()
 	else
