@@ -464,16 +464,14 @@ slashCommands.wipelevel = {
 }
 
 
+-- FIXME: This is horrible, please put it out of its misery
 slashCommands.dumplevel = {
 	func = function(...)
 	
-	local dmpLevel = ...
-	
-	if dmpLevel == nil then
-		dmpLevel = currentPlayerLevel
+	local function doDump(lvl)
 		
-		print("\n")
-		print("LevelData for level "..dmpLevel..":")
+		print(" ")
+		print("LevelData for level "..lvl..":")
 		
 		local function dumpTbl (tbl, indent)
 			local indent = indent or 0
@@ -487,12 +485,26 @@ slashCommands.dumplevel = {
 				end
 			end
 		end		
-		dumpTbl(DataHoarderDB.LevelData[dmpLevel])
-		
-	elseif not DataHoarderDB.LevelData[dmpLevel] then
-		print( color.red.."Not a valid level: |r"..dmpLevel )
-		do return end
+		dumpTbl(DataHoarderDB.LevelData[lvl])	
 	end
+	
+	local dumpLvl = nil
+	
+	if ... then
+		if pcall(tonumber,...) then
+			dumpLvl = tonumber(...)
+			if DataHoarderDB.LevelData[dumpLvl] then
+				doDump(dumpLvl)
+			else
+				print( color.red.."Not a valid level: |r".. ...)
+			end
+		else
+			print( color.red.."Not a valid level: |r".. ...)
+		end
+	else
+		doDump(currentPlayerLevel)
+	end
+	
 	end,
 
 	desc = "Dump the LevelData for this level only (defaults to current level)"
