@@ -127,35 +127,28 @@ dbLoadFrame:SetScript("OnEvent", initDB)
 local hookedEvents = {}
 
 
--- TODO: Temporary function breakout to test EJ not working during loadscreen
-
-local function saveInstanceDBInfo()
-	local instance = GetInstanceInfo()
-	local instanceTier = tostring(GetCurrentInstanceTier())
-	if not DataHoarderDB.Dungeons then DataHoarderDB.Dungeons = {} end
-
-	DataHoarderDB.Dungeons[instanceTier] = DataHoarderDB.Dungeons[instanceTier] or {}
-	DataHoarderDB.Dungeons[instanceTier][instance] = DataHoarderDB.Dungeons[instanceTier][instance] or {}
-
-	if DataHoarderDB.Dungeons[instanceTier][instance].Visits then
-		DataHoarderDB.Dungeons[instanceTier][instance].Visits = DataHoarderDB.Dungeons[instanceTier][instance].Visits + 1
-		if doEventSpam then
-			print("Already visited "..instance.." "..DataHoarderDB.Dungeons[instanceTier][instance].Visits-1 .. " times")
-		end
-	else
-		DataHoarderDB.Dungeons[instanceTier][instance].Visits = 1
-		if doEventSpam then
-			print("First visit to "..instance.."!")
-		end
-	end
-
-end
-
 -- Zone change, collect continent and zone information and count number of visits
 function hookedEvents.ZONE_CHANGED_NEW_AREA(...)
 
 	if IsInInstance() then
-		C_Timer.After(5, saveInstanceDBInfo)
+		local instance = GetInstanceInfo()
+		local instanceTier = tostring(GetCurrentInstanceTier())
+		if not DataHoarderDB.Dungeons then DataHoarderDB.Dungeons = {} end
+
+		DataHoarderDB.Dungeons[instanceTier] = DataHoarderDB.Dungeons[instanceTier] or {}
+		DataHoarderDB.Dungeons[instanceTier][instance] = DataHoarderDB.Dungeons[instanceTier][instance] or {}
+
+		if DataHoarderDB.Dungeons[instanceTier][instance].Visits then
+			DataHoarderDB.Dungeons[instanceTier][instance].Visits = DataHoarderDB.Dungeons[instanceTier][instance].Visits + 1
+			if doEventSpam then
+				print("Already visited "..instance.." "..DataHoarderDB.Dungeons[instanceTier][instance].Visits-1 .. " times")
+			end
+		else
+			DataHoarderDB.Dungeons[instanceTier][instance].Visits = 1
+			if doEventSpam then
+				print("First visit to "..instance.."!")
+			end
+		end
 	else
 
 		local cont = au_getPMapInfos()[1];
