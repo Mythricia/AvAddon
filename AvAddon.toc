@@ -5,7 +5,7 @@
 ## Notes: This addon will be |cFF9400D3f|cFF4B0082a|cFF0000FFb|cFF00FF00u|cFFFFFF00l|cFFFF7F00o|cFFF00F0Fu|cFFFF0000s|r|r|r|r|r|r|r|r one day!
 ## Version: 0.1
 ## DefaultState: disabled
-## SavedVariablesPerCharacter: DataHoarderDB
+## SavedVariablesPerCharacter: DataHoarderDB, DevData
 
 AvUtils.lua
 DataHoarder.lua

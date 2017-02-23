@@ -56,27 +56,27 @@ local color = {
 -- Load DH database if it exists for this character, if not, create it and load defaults
 -- This function can also be called ingame by /ava dbDefaults
 local function dbLoadDefaults()
--- Use the wipe() function supplied by the WoWLua API -
--- This wipes the table but keeps all references to it intact
-wipe(DataHoarderDB)
+	-- Use the wipe() function supplied by the WoWLua API -
+	-- This wipes the table but keeps all references to it intact
+	wipe(DataHoarderDB)
 
-DataHoarderDB.Character 		= UnitName("player")
-DataHoarderDB.LastContinent 	= ""
-DataHoarderDB.LastZone 			= ""
-DataHoarderDB.ContinentsVisited = 0
-DataHoarderDB.ZonesVisited 		= 0
-DataHoarderDB.Continents 		= {}
-DataHoarderDB.LevelData			= {}
---[[
+	DataHoarderDB.Character 		= UnitName("player")
+	DataHoarderDB.LastContinent 	= ""
+	DataHoarderDB.LastZone 			= ""
+	DataHoarderDB.ContinentsVisited = 0
+	DataHoarderDB.ZonesVisited 		= 0
+	DataHoarderDB.Continents 		= {}
+	DataHoarderDB.LevelData			= {}
+	--[[
 	1 = {
 
-		Played = --- timePlayed, synced with the in-game current level /played statistic on login & logout, if possible
-		AFKTime= --- timeWhileAFK
-		Active = --- timePlayed - timeAFK
-		AvgDPS = --- averageDPSThroughLevel
-		CombatTime = --- Rolling total time _in combat_
+	Played = --- timePlayed, synced with the in-game current level /played statistic on login & logout, if possible
+	AFKTime= --- timeWhileAFK
+	Active = --- timePlayed - timeAFK
+	AvgDPS = --- averageDPSThroughLevel
+	CombatTime = --- Rolling total time _in combat_
 
-	}
+}
 }
 ]]
 end
@@ -94,7 +94,7 @@ local function initDB (self, event, ...)
 	if event == "ADDON_LOADED" and ... == addonName then
 		isAddonLoaded = true
 		print( rainbowName .. " loaded. ".."\nUse "..color.cyan.."/ava spam|r to see logging activity."..
-			"\nUse "..color.cyan.."/ava|r to see options "..color.red.."(beware dragons)\n");
+		"\nUse "..color.cyan.."/ava|r to see options "..color.red.."(beware dragons)\n");
 
 		-- Table gynmastics to find out whether database is actually populated (count num of Keys, can't rely on #length)
 		-- If not, load the defaults
@@ -127,51 +127,79 @@ dbLoadFrame:SetScript("OnEvent", initDB)
 local hookedEvents = {}
 
 
+-- TODO: Temporary function breakout to test EJ not working during loadscreen
+
+local function saveInstanceDBInfo()
+	local instance = GetInstanceInfo()
+	local instanceTier = tostring(GetCurrentInstanceTier())
+	if not DataHoarderDB.Dungeons then DataHoarderDB.Dungeons = {} end
+
+	DataHoarderDB.Dungeons[instanceTier] = DataHoarderDB.Dungeons[instanceTier] or {}
+	DataHoarderDB.Dungeons[instanceTier][instance] = DataHoarderDB.Dungeons[instanceTier][instance] or {}
+
+	if DataHoarderDB.Dungeons[instanceTier][instance].Visits then
+		DataHoarderDB.Dungeons[instanceTier][instance].Visits = DataHoarderDB.Dungeons[instanceTier][instance].Visits + 1
+		if doEventSpam then
+			print("Already visited "..instance.." "..DataHoarderDB.Dungeons[instanceTier][instance].Visits-1 .. " times")
+		end
+	else
+		DataHoarderDB.Dungeons[instanceTier][instance].Visits = 1
+		if doEventSpam then
+			print("First visit to "..instance.."!")
+		end
+	end
+
+end
+
 -- Zone change, collect continent and zone information and count number of visits
 function hookedEvents.ZONE_CHANGED_NEW_AREA(...)
 
-	local cont = au_getPMapInfos()[1];
-	local zone = au_getPMapInfos()[2];
-	if doEventSpam then
-		print (color.cyan .. "Character location: " .. color.red .. cont..color.green.." > "..color.red..zone)
-	end
+	if IsInInstance() then
+		C_Timer.After(5, saveInstanceDBInfo)
+	else
 
-	if DataHoarderDB.LastContinent ~= cont then
-		DataHoarderDB.LastContinent = cont
+		local cont = au_getPMapInfos()[1];
+		local zone = au_getPMapInfos()[2];
+		if doEventSpam then
+			print (color.cyan .. "Character location: " .. color.red .. cont..color.green.." > "..color.red..zone)
+		end
 
-		if DataHoarderDB.Continents[cont] == nil then
-			if doEventSpam then
-				print("First visit to "..cont.."!")
+		if DataHoarderDB.LastContinent ~= cont then
+			DataHoarderDB.LastContinent = cont
+
+			if DataHoarderDB.Continents[cont] == nil then
+				if doEventSpam then
+					print("First visit to "..cont.."!")
+				end
+				DataHoarderDB.Continents[cont] = {}
+				DataHoarderDB.Continents[cont].Visits = 1
+				DataHoarderDB.ContinentsVisited = DataHoarderDB.ContinentsVisited + 1
+			else
+				DataHoarderDB.Continents[cont].Visits = DataHoarderDB.Continents[cont].Visits + 1
+				if doEventSpam then
+					print("Already visited "..cont.." "..DataHoarderDB.Continents[cont].Visits-1 .. " times")
+				end
 			end
-			DataHoarderDB.Continents[cont] = {}
-			DataHoarderDB.Continents[cont].Visits = 1
-			DataHoarderDB.ContinentsVisited = DataHoarderDB.ContinentsVisited + 1
-		else
-			DataHoarderDB.Continents[cont].Visits = DataHoarderDB.Continents[cont].Visits + 1
-			if doEventSpam then
-				print("Already visited "..cont.." "..DataHoarderDB.Continents[cont].Visits-1 .. " times")
+		end
+
+		if DataHoarderDB.LastZone ~= zone then
+			DataHoarderDB.LastZone = zone
+
+			if DataHoarderDB.Continents[cont][zone] == nil then
+				if doEventSpam then
+					print("First visit to "..zone.."!")
+				end
+				DataHoarderDB.Continents[cont][zone] = {}
+				DataHoarderDB.Continents[cont][zone].Visits = 1
+				DataHoarderDB.ZonesVisited = DataHoarderDB.ZonesVisited + 1
+			else
+				DataHoarderDB.Continents[cont][zone].Visits = DataHoarderDB.Continents[cont][zone].Visits + 1
+				if doEventSpam then
+					print("Already visited "..zone.." "..DataHoarderDB.Continents[cont][zone].Visits-1 .. " times")
+				end
 			end
 		end
 	end
-
-	if DataHoarderDB.LastZone ~= zone then
-		DataHoarderDB.LastZone = zone
-
-		if DataHoarderDB.Continents[cont][zone] == nil then
-			if doEventSpam then
-				print("First visit to "..zone.."!")
-			end
-			DataHoarderDB.Continents[cont][zone] = {}
-			DataHoarderDB.Continents[cont][zone].Visits = 1
-			DataHoarderDB.ZonesVisited = DataHoarderDB.ZonesVisited + 1
-		else
-			DataHoarderDB.Continents[cont][zone].Visits = DataHoarderDB.Continents[cont][zone].Visits + 1
-			if doEventSpam then
-				print("Already visited "..zone.." "..DataHoarderDB.Continents[cont][zone].Visits-1 .. " times")
-			end
-		end
-	end
-
 	-- Tell the event dispatcher we've handled the event
 	return true
 end
@@ -267,8 +295,8 @@ function hookedEvents.COMBAT_LOG_EVENT_UNFILTERED(...)
 				-- Increment the damage accumulator
 				combatDamage = combatDamage + amount
 
-			-- Check if we're dealing with a melee swing
-		elseif eventType == "SWING_DAMAGE" then
+				-- Check if we're dealing with a melee swing
+			elseif eventType == "SWING_DAMAGE" then
 
 				-- It's melee, no prefix parameters, all extra args are damage details
 				local amount, overkill, school, resisted,
@@ -360,11 +388,11 @@ local slashCommands = {}
 
 slashCommands.listhooks = {
 	func = function(...)
-	print(" ")
-	print(rainbowName.." hooked events: ")
-	for k, v in pairs( hookedEvents ) do
-		print( color.red, k )
-	end
+		print(" ")
+		print(rainbowName.." hooked events: ")
+		for k, v in pairs( hookedEvents ) do
+			print( color.red, k )
+		end
 	end,
 
 	desc = "Lists all registered events"
@@ -373,8 +401,8 @@ slashCommands.listhooks = {
 
 slashCommands.dbwipe = {
 	func = function(...)
-	wipe(DataHoarderDB)
-	print(color.cyan.."DataHoarderDB"..color.red.." wiped.")
+		wipe(DataHoarderDB)
+		print(color.cyan.."DataHoarderDB"..color.red.." wiped.")
 	end,
 
 	desc = "Wipes database clean, without deleting the actual db"
@@ -383,12 +411,12 @@ slashCommands.dbwipe = {
 
 slashCommands.spam = {
 	func = function(...)
-	doEventSpam = not doEventSpam
-	if doEventSpam then
-		print(rainbowName..": Event spam "..color.red.."enabled")
-	else
-		print(rainbowName..": Event spam "..color.green.."disabled")
-	end
+		doEventSpam = not doEventSpam
+		if doEventSpam then
+			print(rainbowName..": Event spam "..color.red.."enabled")
+		else
+			print(rainbowName..": Event spam "..color.green.."disabled")
+		end
 	end,
 
 	desc = "Toggles verbose reporting of events"
@@ -397,81 +425,12 @@ slashCommands.spam = {
 
 slashCommands.dbdump = {
 	func = function(...)
-	if next(DataHoarderDB) == nil then
-		print("Nothing to dump, db empty")
-		do return end
-	end
-	print("\n")
-	print("DataHoarderDB contents:")
-
-	local function dumpTbl (tbl, indent)
-		local indent = indent or 0
-		for k, v in pairs(tbl) do
-			formatting = string.rep(color.purple .. "| - - ", indent) .. color.teal .. tostring(k)
-			if type(v) == "table" then
-				print(formatting .. color.green .. " +")
-				dumpTbl(v, indent+1)
-			else
-				print(formatting .. ": " .. color.cyan .. tostring(v))
-			end
+		if next(DataHoarderDB) == nil then
+			print("Nothing to dump, db empty")
+			do return end
 		end
-	end
-
-	dumpTbl(DataHoarderDB)
-	end,
-
-	desc = ("Print the "..color.red.."entire DataHoarder database for this character!")
-}
-
-
-slashCommands.dfunc = {
-	func = function(...)
-	print(color.pink.. "Nope.")
-	end,
-
-	desc = ("Debug function - "..color.red.."MAY DO ANYTHING")
-}
-
-
-slashCommands.verboseerrors = {
-	func = function(...)
-	doVerboseErrors = not doVerboseErrors
-	if doVerboseErrors then
-		print(rainbowName..": Verbose error logging "..color.red.."enabled")
-	else
-		print(rainbowName..": Verbose error logging "..color.green.."disabled")
-	end
-	end,
-
-	desc = "Toggles extra verbose error logging"
-}
-
-
-
-slashCommands.wipelevel = {
-	func = function(...)
-	local targLevel = ...
-
-	if targLevel == nil then targLevel = currentPlayerLevel end
-
-	if DataHoarderDB.LevelData[targLevel] then
-		DataHoarderDB.LevelData[targLevel] = nil
-		DataHoarderDB.LevelData[targLevel] = {}
-	end
-	end,
-
-	desc = "Wipe db records for the specified level"
-}
-
-
--- FIXME: This is horrible, please put it out of its misery
-slashCommands.dumplevel = {
-	func = function(...)
-
-	local function doDump(lvl)
-
-		print(" ")
-		print("LevelData for level "..lvl..":")
+		print("\n")
+		print("DataHoarderDB contents:")
 
 		local function dumpTbl (tbl, indent)
 			local indent = indent or 0
@@ -485,77 +444,146 @@ slashCommands.dumplevel = {
 				end
 			end
 		end
-		dumpTbl(DataHoarderDB.LevelData[lvl])
-	end
 
-	local dumpLvl = nil
-
-	if ... then
-		if pcall(tonumber,...) then
-			dumpLvl = tonumber(...)
-			if DataHoarderDB.LevelData[dumpLvl] then
-				doDump(dumpLvl)
-			else
-				print( color.red.."Not a valid level: |r".. ...)
-			end
-		else
-			print( color.red.."Not a valid level: |r".. ...)
-		end
-	else
-		doDump(currentPlayerLevel)
-	end
-
+		dumpTbl(DataHoarderDB)
 	end,
 
-	desc = "Dump the LevelData for this level only (defaults to current level)"
+	desc = ("Print the "..color.red.."entire DataHoarder database for this character!")
 }
 
 
+slashCommands.dfunc = {
+	func = function(...)
+		print(color.pink.. "Nope.")
+	end,
 
--- SlashCmd catcher/preprocessor
-local function slashHandler(msg)
-
-	-- split the recieved slashCmd into a root command plus any extra arguments
-	local parts = {}
-	local root
-
-	for part in string.lower(msg):gmatch("%S+") do
-		table.insert(parts, part)
-	end
-
-	root = parts[1]
-	table.remove(parts, 1) --FIXME: Must be a better way to strip the first element of the table, or just handle the whole thing better
+	desc = ("Debug function - "..color.red.."MAY DO ANYTHING")
+	}
 
 
-	-- Utility function to print all available commands
-	local function printCmdList()
-		local slashListSeparator = "      `- "
-
-		print(" ")
-		print(rainbowName.." commands:")
-
-		for k, v in pairs(slashCommands) do
-			print(k)
-			if v.desc then
-				print(color.cyan..slashListSeparator..color.orange..v.desc)
+	slashCommands.verboseerrors = {
+		func = function(...)
+			doVerboseErrors = not doVerboseErrors
+			if doVerboseErrors then
+				print(rainbowName..": Verbose error logging "..color.red.."enabled")
 			else
-				print(slashListSeparator..color.red.."NoDesc")
+				print(rainbowName..": Verbose error logging "..color.green.."disabled")
 			end
+		end,
+
+		desc = "Toggles extra verbose error logging"
+	}
+
+
+
+	slashCommands.wipelevel = {
+		func = function(...)
+			local targLevel = ...
+
+			if targLevel == nil then targLevel = currentPlayerLevel end
+
+			if DataHoarderDB.LevelData[targLevel] then
+				DataHoarderDB.LevelData[targLevel] = nil
+				DataHoarderDB.LevelData[targLevel] = {}
+			end
+		end,
+
+		desc = "Wipe db records for the specified level"
+	}
+
+
+	-- FIXME: This is horrible, please put it out of its misery
+	slashCommands.dumplevel = {
+		func = function(...)
+
+			local function doDump(lvl)
+
+				print(" ")
+				print("LevelData for level "..lvl..":")
+
+				local function dumpTbl (tbl, indent)
+					local indent = indent or 0
+					for k, v in pairs(tbl) do
+						formatting = string.rep(color.purple .. "| - - ", indent) .. color.teal .. tostring(k)
+						if type(v) == "table" then
+							print(formatting .. color.green .. " +")
+							dumpTbl(v, indent+1)
+						else
+							print(formatting .. ": " .. color.cyan .. tostring(v))
+						end
+					end
+				end
+				dumpTbl(DataHoarderDB.LevelData[lvl])
+			end
+
+			local dumpLvl = nil
+
+			if ... then
+				if pcall(tonumber,...) then
+					dumpLvl = tonumber(...)
+					if DataHoarderDB.LevelData[dumpLvl] then
+						doDump(dumpLvl)
+					else
+						print( color.red.."Not a valid level: |r".. ...)
+					end
+				else
+					print( color.red.."Not a valid level: |r".. ...)
+				end
+			else
+				doDump(currentPlayerLevel)
+			end
+
+		end,
+
+		desc = "Dump the LevelData for this level only (defaults to current level)"
+	}
+
+
+
+	-- SlashCmd catcher/preprocessor
+	local function slashHandler(msg)
+
+		-- split the recieved slashCmd into a root command plus any extra arguments
+		local parts = {}
+		local root
+
+		for part in string.lower(msg):gmatch("%S+") do
+			table.insert(parts, part)
+		end
+
+		root = parts[1]
+		table.remove(parts, 1) --FIXME: Must be a better way to strip the first element of the table, or just handle the whole thing better
+
+
+		-- Utility function to print all available commands
+		local function printCmdList()
+			local slashListSeparator = "      `- "
+
+			print(" ")
+			print(rainbowName.." commands:")
+
+			for k, v in pairs(slashCommands) do
+				print(k)
+				if v.desc then
+					print(color.cyan..slashListSeparator..color.orange..v.desc)
+				else
+					print(slashListSeparator..color.red.."NoDesc")
+				end
+			end
+		end
+
+
+		-- Check if the root command exists, and call it. Else print error and list available commands + their description (if any)
+		if slashCommands[root] ~= nil then
+			slashCommands[root].func(unpack(parts))
+		elseif root == nil then
+			printCmdList()
+		else
+			print(" ")
+			print(rainbowName.." unrecognized command: "..color.red..root)
+			print("List available commands with "..color.cyan.."/ava|r or "..color.cyan.."/avaddon")
 		end
 	end
 
 
-	-- Check if the root command exists, and call it. Else print error and list available commands + their description (if any)
-	if slashCommands[root] ~= nil then
-		slashCommands[root].func(unpack(parts))
-	elseif root == nil then
-		printCmdList()
-	else
-		print(" ")
-		print(rainbowName.." unrecognized command: "..color.red..root)
-		print("List available commands with "..color.cyan.."/ava|r or "..color.cyan.."/avaddon")
-	end
-end
-
-
-SlashCmdList["AVADDON"] = slashHandler;
+	SlashCmdList["AVADDON"] = slashHandler;
