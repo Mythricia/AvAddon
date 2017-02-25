@@ -131,22 +131,23 @@ local hookedEvents = {}
 function hookedEvents.ZONE_CHANGED_NEW_AREA(...)
 
 	if IsInInstance() then
-		local instance = GetInstanceInfo()
+		-- Use GetRealZoneText() for zone name, it's more consistent than what GetInstanceInfo() returns
+		local instanceName = GetRealZoneText()
 		local instanceTier = tostring(GetCurrentInstanceTier())
 		if not DataHoarderDB.Dungeons then DataHoarderDB.Dungeons = {} end
 
 		DataHoarderDB.Dungeons[instanceTier] = DataHoarderDB.Dungeons[instanceTier] or {}
-		DataHoarderDB.Dungeons[instanceTier][instance] = DataHoarderDB.Dungeons[instanceTier][instance] or {}
+		DataHoarderDB.Dungeons[instanceTier][instanceName] = DataHoarderDB.Dungeons[instanceTier][instanceName] or {}
 
-		if DataHoarderDB.Dungeons[instanceTier][instance].Visits then
-			DataHoarderDB.Dungeons[instanceTier][instance].Visits = DataHoarderDB.Dungeons[instanceTier][instance].Visits + 1
+		if DataHoarderDB.Dungeons[instanceTier][instanceName].Visits then
+			DataHoarderDB.Dungeons[instanceTier][instanceName].Visits = DataHoarderDB.Dungeons[instanceTier][instanceName].Visits + 1
 			if doEventSpam then
-				print("Already visited "..instance.." "..DataHoarderDB.Dungeons[instanceTier][instance].Visits-1 .. " times")
+				print("Already visited "..instanceName.." "..DataHoarderDB.Dungeons[instanceTier][instanceName].Visits-1 .. " times")
 			end
 		else
-			DataHoarderDB.Dungeons[instanceTier][instance].Visits = 1
+			DataHoarderDB.Dungeons[instanceTier][instanceName].Visits = 1
 			if doEventSpam then
-				print("First visit to "..instance.."!")
+				print("First visit to "..instanceName.."!")
 			end
 		end
 	else

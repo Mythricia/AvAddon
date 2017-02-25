@@ -1,110 +1,95 @@
 -- For hotloading test code
 -- ONLY DEFINE THINGS, DONT EXECUTE THEM
 
+local InstanceTable
+local tierList
 
 -- Programmatically generate list of all dungeons and raids, to be used in determining what expansion
 -- the instance your are currently inside, actually belongs to.
 
 -- Generate table of dungeon and raid instances by expansion
-function GenerateInstanceTables()
-  local instTable = {}
+local function GenerateInstanceTable()
+  InstanceTable = {}
 
-  instTable.trackedTypes = "party, raid"
+  InstanceTable.trackedTypes = "party, raid"
 
   local numTiers = EJ_GetNumTiers()
   local numToScan = 10000
-  local raid = false
 
-  for b=1, 2 do
 
-    local instanceType = ""
-    if raid then instanceType = "Raids" else instanceType = "Dungeons" end
-    instTable[instanceType] = {}
+  local function EJCrawlPass(scanRaids)
+    -- Bullshit Lua ternary-ish operator
+    local instanceType = (scanRaids and "Raids") or ("Dungeons")
+
+    InstanceTable[instanceType] = {}
 
     for t=1, numTiers do
       EJ_SelectTier(t)
       local tierName = EJ_GetTierInfo(t)
-      instTable[instanceType][tierName] = {}
+      InstanceTable[instanceType][tierName] = {}
 
       for i=1, numToScan do
-        local id, name = EJ_GetInstanceByIndex(i, raid)
+        local id, name = EJ_GetInstanceByIndex(i, scanRaids)
         if name then
-          instTable[instanceType][tierName][name] = id
+          InstanceTable[instanceType][tierName][name] = id
         end
       end
     end
-    raid = not raid
   end
 
-  -- Generate a chronologically ordered list of expansion names
-  tierList = tierList or (function()
-    local tt = {}
+  -- Do one pass for raids, one pass for 5mans
+  EJCrawlPass(true)
+  EJCrawlPass(false)
+
+  -- Generate a chronologically ordered list of expansion names if it doesn't exist
+  if not tierList then
+    tierList = {}
     for i=1, EJ_GetNumTiers() do
-      tt[i] = EJ_GetTierInfo(i)
+      tierList[i] = EJ_GetTierInfo(i)
     end
-    return tt
-  end)()
-  
-  return instTable
+  end
 end
 
 
---[[Figure out which expansion our current instance belongs to.
 
-Problem: Remade dungeons, such as Deadmines, belong to more than 1 expansion,
-but retain only one name and instanceID. Making a simple list of ID's insufficient.
-
-At the time of writing (Legion), remade Vanilla dungeons are all Heroic variants.
-Meaning, if we enter a "vanilla" instance, on Heroic difficulty, it must be a remake.
-We can then simply skip scanning Vanilla, the next hit will accurately tell us our real tier.
-
-This can break if something like a TBC instance is remade, for example, so this is a fragile approach.
---]]
 function GetCurrentInstanceTier()
   -- Check that the InstanceTable even exists, if not, create it
-  InstanceTable = InstanceTable or GenerateInstanceTables()
+  if not InstanceTable then
+    GenerateInstanceTable()
+  end
 
   -- Bail out if we're not even in an instance!
   if not IsInInstance() then do return "NotAnInstance" end end
 
 
-  local name, instanceType, difficulty, difficultyName = GetInstanceInfo()
+  local _, instanceType, difficultyID = GetInstanceInfo()
+  local zoneName = GetRealZoneText()
 
   -- Determine the search key to be used. This should be refactored somehow.
-  local searchType = (
-  function()
-    if instanceType == "party" then
-      return "Dungeons"
-    elseif instanceType == "raid" then
-      return "Raids"
+  -- Lua ternary-ish bullshit
+  local searchType = (instanceType == "party" and "Dungeons") or ("Raids")
+
+  -- First, check if we even track this type of instance, if not, bail out
+  if not string.find(InstanceTable.trackedTypes, instanceType) then return "UnknownInstanceType" end
+
+  -- Second, is it Heroic? If so, skip all of Vanilla. Else, search the entire instance table
+  -- Use another strikingly confusing Lua ternary-ish boolean bullshit operator for this
+  local startIndex = (difficultyID == 2 and 2) or (1)
+
+  -- Perform the actual search, scanning by instance name, skipping Classic if we're in Heroic
+  -- Can't scan using instanceID, since the Encounter Journal is not ready during loading screen, and can't return it
+  -- Also can't use the name returned by GetInstanceInfo() since it's inconsistent. GetRealZoneText() seems more accurate for instances.
+  for i = startIndex, #tierList do
+    local subTable = InstanceTable[searchType][tierList[i]]
+
+    for k, v in pairs(subTable) do
+      if (zoneName == k) then
+        return tierList[i]
+      end
     end
   end
-)()
-
--- First, check if we even track this type of instance, if not, bail out
-if not string.find(InstanceTable.trackedTypes, instanceType) then return "UnknownInstanceType" end
-
--- Second, is it Heroic? If so, skip all of Vanilla. Else, search the entire instance table
-local startIndex = (function()
-  if difficulty == 2 then
-    return 2
-  else return 1
-  end
-end)()
-
-
--- Perform the actual search, scanning by instance name, skipping Classic if we're in Heroic
--- Can't scan using instanceID, since the Encounter Journal is not ready during loading screen, and can't return it
-for i = startIndex, #tierList do
-  subTable = InstanceTable[searchType][tierList[i]]
-
-  for k, v in pairs(subTable) do
-    if (name == k) then
-      return tierList[i]
-    end
-  end
-end
-return "UnknownTier"
+  -- Fallthrough return
+  return "UnknownTier"
 end
 
 -- Celebratory print()
