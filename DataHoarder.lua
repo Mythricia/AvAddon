@@ -14,7 +14,6 @@ local currentPlayerLevel = 0
 -- Debug, damage logging accumulator
 local combatDamage = 0
 
-
 -- This shouldn't be here, but it's here, so that I don't get a nil error when initializing DB later...
 DataHoarderDB = DataHoarderDB or {}
 
@@ -42,8 +41,6 @@ local AvColors = addonTable.AvColors
 -- Load DH database if it exists for this character, if not, create it and load defaults
 -- This function can also be called ingame by /ava dbDefaults
 local function dbLoadDefaults()
-	-- Use the wipe() function supplied by the WoWLua API -
-	-- This wipes the table but keeps all references to it intact
 	wipe(DataHoarderDB)
 
 	DataHoarderDB.Character 		= UnitName("player")
@@ -53,18 +50,6 @@ local function dbLoadDefaults()
 	DataHoarderDB.ZonesVisited 		= 0
 	DataHoarderDB.Continents 		= {}
 	DataHoarderDB.LevelData			= {}
-	--[[
-	1 = {
-
-	Played = --- timePlayed, synced with the in-game current level /played statistic on login & logout, if possible
-	AFKTime= --- timeWhileAFK
-	Active = --- timePlayed - timeAFK
-	AvgDPS = --- averageDPSThroughLevel
-	CombatTime = --- Rolling total time _in combat_
-
-}
-}
-]]
 end
 
 
@@ -98,6 +83,8 @@ local function initDB (self, event, ...)
 		else
 			print("Good news everyone, "..AvColors.green.."DataHoarderDB was not empty!")
 		end
+
+		addonTable.DHDB = DataHoarderDB
 	end
 end
 

@@ -64,18 +64,8 @@ local function GetPlayerMapInfos()
 	-- Move the world map view to the players current zone
 	SetMapToCurrentZone()
 
-	-- Only generate table once per session
+	-- Only generate table once per session, on demand
 	continentNames = continentNames or GenerateContNames()
-	-- {
-	-- 	[1]="Kalimdor",
-	-- 	[2]="Eastern Kingdoms",
-	-- 	[3]="Outland",
-	-- 	[4]="Northrend",
-	-- 	[5]="The Maelstrom",
-	-- 	[6]="Pandaria",
-	-- 	[7]="Draenor",
-	-- 	[8]="Broken Isles"
-	-- }
 
 	local contID = GetCurrentMapContinent()
 	local contName = continentNames[contID]
