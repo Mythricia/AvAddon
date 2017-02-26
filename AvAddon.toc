@@ -8,8 +8,8 @@
 ## SavedVariablesPerCharacter: DataHoarderDB, DevData
 
 AvUtils.lua
-DataHoarder.lua
 Dev.lua
+DataHoarder.lua
 
 #|cFF9400D3f
 #|cFF4B0082a

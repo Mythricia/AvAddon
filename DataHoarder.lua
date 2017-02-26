@@ -35,7 +35,8 @@ local au_genContNames = addonTable.AvUtil.GenerateContNames
 local au_getPMapInfos = addonTable.AvUtil.GetPlayerMapInfos	-- {contName, zone, subzone}
 local au_strFmt = addonTable.AvUtil.FormatDecimalString
 local au_ppTable = addonTable.AvUtil.ppTable
-local AvColors = addonTable.AvColors
+local au_GetCurrentInstanceTier = addonTable.AvUtil.GetCurrentInstanceTier
+local AvColors = addonTable.AvUtil.AvColors
 
 
 -- Load DH database if it exists for this character, if not, create it and load defaults
@@ -106,7 +107,7 @@ function hookedEvents.ZONE_CHANGED_NEW_AREA(...)
 	if IsInInstance() then
 		-- Use GetRealZoneText() for zone name, it's more consistent than what GetInstanceInfo() returns
 		local instanceName = GetRealZoneText()
-		local instanceTier = tostring(addonTable:GetCurrentInstanceTier())
+		local instanceTier = tostring(au_GetCurrentInstanceTier())
 		if not DataHoarderDB.Dungeons then DataHoarderDB.Dungeons = {} end
 
 		DataHoarderDB.Dungeons[instanceTier] = DataHoarderDB.Dungeons[instanceTier] or {}

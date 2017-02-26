@@ -117,4 +117,4 @@ addonTable.AvUtil.ppTable = ppTable
 addonTable.AvUtil.GetPlayerMapInfos = GetPlayerMapInfos
 addonTable.AvUtil.GenerateContNames = GenerateContNames
 addonTable.AvUtil.FormatDecimalString = FormatDecimalString
-addonTable.AvColors = AvColors
+addonTable.AvUtil.AvColors = AvColors

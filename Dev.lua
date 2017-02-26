@@ -52,7 +52,7 @@ end
 
 
 
-function addonTable:GetCurrentInstanceTier()
+local function GetCurrentInstanceTier()
   -- Check that the InstanceTable even exists, if not, create it
   if not InstanceTable then
     GenerateInstanceTable()
@@ -94,3 +94,5 @@ end
 
 -- Celebratory print()
 -- print("You are in \""..select(1,GetInstanceInfo()).."\ ("..select(4,GetInstanceInfo())..")\", from the \""..GetCurrentInstanceTier().."\" expansion.")
+
+addonTable.AvUtil.GetCurrentInstanceTier = GetCurrentInstanceTier
