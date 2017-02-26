@@ -2,7 +2,7 @@
 -- By: Avael @ Argent Dawn EU
 
 -- Local vars
-local addonName = ...
+local addonName, addonTable = ...
 local rainbowName = "|cFF9400D3A|r|cFF4B0082v|r|cFFEE1289A|r|cFF00FF00d|r|cFFFFFF00d|r|cFFFF7F00o|r|cFFFF0000n|r"
 local doEventSpam = false
 local doVerboseErrors = false
@@ -21,36 +21,22 @@ DataHoarderDB = DataHoarderDB or {}
 
 -- Cache some common functions
 -- Common lua:
-local table_insert = table.insert;
-local type = type;
+local table = table
+local type = type
 local pairs = pairs
 local ipairs = ipairs
-local _G = _G
-local string_len = string.len;
-local string_sub = string.sub;
-local string_gsub = string.gsub;
-local string_format = string.format;
-local string_match = string.match;
+local string = string
+local wipe = wipe
+local print = print
+local tostring = tostring
+local tonumber = tonumber
 
 -- AvUtils
-local au_genContNames = AvUtil_GenerateContNames;
-local au_getPMapInfos = AvUtil_GetPlayerMapInfos;	-- {contName, zone, subzone}
-local au_strFmt = AvUtil_FormatDecimalString;
-
-
--- Pretty color tags
-local cTag = "|cFF"	-- Separate the tag and Alpha (always FF) from the actual hex color definitions
-local color = {
-	red 	= cTag.."FF0000",
-	green	= cTag.."00FF00",
-	blue	= cTag.."0000FF",
-	cyan	= cTag.."00FFFF",
-	teal	= cTag.."008080",
-	orange	= cTag.."FFA500",
-	brown	= cTag.."8B4500",
-	pink	= cTag.."EE1289",
-	purple	= cTag.."9F79EE",
-}
+local au_genContNames = addonTable.AvUtil.GenerateContNames
+local au_getPMapInfos = addonTable.AvUtil.GetPlayerMapInfos	-- {contName, zone, subzone}
+local au_strFmt = addonTable.AvUtil.FormatDecimalString
+local au_ppTable = addonTable.AvUtil.ppTable
+local AvColors = addonTable.AvColors
 
 
 -- Load DH database if it exists for this character, if not, create it and load defaults
@@ -93,8 +79,8 @@ dbLoadFrame:RegisterEvent("ADDON_LOADED")
 local function initDB (self, event, ...)
 	if event == "ADDON_LOADED" and ... == addonName then
 		isAddonLoaded = true
-		print( rainbowName .. " loaded. ".."\nUse "..color.cyan.."/ava spam|r to see logging activity."..
-		"\nUse "..color.cyan.."/ava|r to see options "..color.red.."(beware dragons)\n");
+		print( rainbowName .. " loaded. ".."\nUse "..AvColors.cyan.."/ava spam|r to see logging activity."..
+		"\nUse "..AvColors.cyan.."/ava|r to see options "..AvColors.red.."(beware dragons)\n");
 
 		-- Table gynmastics to find out whether database is actually populated (count num of Keys, can't rely on #length)
 		-- If not, load the defaults
@@ -107,10 +93,10 @@ local function initDB (self, event, ...)
 		end
 
 		if (dbSize() == 0) then
-			print("DataHoarderDB is "..color.red.."nil/empty, |rloading defaults")
+			print("DataHoarderDB is "..AvColors.red.."nil/empty, |rloading defaults")
 			dbLoadDefaults()
 		else
-			print("Good news everyone, "..color.green.."DataHoarderDB was not empty!")
+			print("Good news everyone, "..AvColors.green.."DataHoarderDB was not empty!")
 		end
 	end
 end
@@ -133,7 +119,7 @@ function hookedEvents.ZONE_CHANGED_NEW_AREA(...)
 	if IsInInstance() then
 		-- Use GetRealZoneText() for zone name, it's more consistent than what GetInstanceInfo() returns
 		local instanceName = GetRealZoneText()
-		local instanceTier = tostring(GetCurrentInstanceTier())
+		local instanceTier = tostring(addonTable:GetCurrentInstanceTier())
 		if not DataHoarderDB.Dungeons then DataHoarderDB.Dungeons = {} end
 
 		DataHoarderDB.Dungeons[instanceTier] = DataHoarderDB.Dungeons[instanceTier] or {}
@@ -155,7 +141,7 @@ function hookedEvents.ZONE_CHANGED_NEW_AREA(...)
 		local cont = au_getPMapInfos()[1];
 		local zone = au_getPMapInfos()[2];
 		if doEventSpam then
-			print (color.cyan .. "Character location: " .. color.red .. cont..color.green.." > "..color.red..zone)
+			print (AvColors.cyan .. "Character location: " .. AvColors.red .. cont..AvColors.green.." > "..AvColors.red..zone)
 		end
 
 		if DataHoarderDB.LastContinent ~= cont then
@@ -231,9 +217,9 @@ function hookedEvents.PLAYER_LEVEL_UP(...)
 	currentPlayerLevel = level
 
 	if doEventSpam then
-		print( "Player leveled up, new level is " .. varArgs[1] )
-		print( "Gained "..varArgs[2].."HP")
-		print( "Gained ".. varArgs[3] .."Mana")
+		print( "Player leveled up, new level is " .. level )
+		print( "Gained ".. hp.."HP")
+		print( "Gained ".. mp .."Mana")
 	end
 
 	-- Create DB entry for the new level
@@ -256,14 +242,14 @@ function hookedEvents.PLAYER_LEVEL_UP(...)
 	-- FIXME: Currently represents REAL WORLD TIME; not /played time or anything contextual.
 	-- calculate the time we spent in the last level, safeguard in case last level is missing db entry
 	local lastLevelTime = DataHoarderDB.LevelData[lastLevel].ExitTime - (DataHoarderDB.LevelData[lastLevel].EntryTime or 0)
-	print (color.pink.."Last level took "..SecondsToTime(lastLevelTime, false, false, 6))
+	print (AvColors.pink.."Last level took "..SecondsToTime(lastLevelTime, false, false, 6))
 
 	-- Calculate the average DPS for the last level
 	local averageDPS = DataHoarderDB.LevelData[lastLevel].DamageTotal / DataHoarderDB.LevelData[lastLevel].CombatTime
 	local combatTime = DataHoarderDB.LevelData[lastLevel].CombatTime
 	DataHoarderDB.LevelData[lastLevel].AvgDPS = averageDPS
 
-	print(color.pink.."During the previous level, you spent "..SecondsToTime(combatTime, false, false, 6).." in combat, and did an average of "..au_strFmt(averageDPS, 0).." Damage Per Second!")
+	print(AvColors.pink.."During the previous level, you spent "..SecondsToTime(combatTime, false, false, 6).." in combat, and did an average of "..au_strFmt(averageDPS, 0).." Damage Per Second!")
 end
 
 
@@ -324,7 +310,7 @@ function hookedEvents.PLAYER_REGEN_ENABLED(...)
 	DataHoarderDB.LevelData[currentPlayerLevel].CombatTime = (DataHoarderDB.LevelData[currentPlayerLevel].CombatTime or 0) + (combatTimeTracker.stop - combatTimeTracker.start)
 
 	DataHoarderDB.LevelData[currentPlayerLevel].DamageTotal = (DataHoarderDB.LevelData[currentPlayerLevel].DamageTotal or 0) + combatDamage
-	print(color.red.."DBDH:: Added "..tostring(combatDamage).." damage to totals.")
+	print(AvColors.red.."DBDH:: Added "..tostring(combatDamage).." damage to totals.")
 
 	combatDamage = 0
 end
@@ -347,16 +333,16 @@ local function catchEvent(self, event, ...)
 
 	-- Check if we should enable verbose output
 	if doEventSpam then
-		print( color.cyan .. addonName .. " caught event: " .. color.red .. event)
+		print( AvColors.cyan .. addonName .. " caught event: " .. AvColors.red .. event)
 		for k, v in pairs( {...} ) do
-			print( color.cyan, k, color.red, v )
+			print( AvColors.cyan, k, AvColors.red, v )
 		end
 	end
 
 
 	-- Call the relevant event handler function if defined, else throw error (if doVerboseErrors enabled)
 	if (hookedEvents[event] == nil or hookedEvents[event](unpack({...})) == nil) and doVerboseErrors then
-		local errString = (color.red.."DataHoarder:: No event handler for:\n"..color.orange..event)
+		local errString = (AvColors.red.."DataHoarder:: No event handler for:\n"..AvColors.orange..event)
 		print(errString)
 		error(errString)
 	end
@@ -385,7 +371,7 @@ slashCommands.listhooks = {
 		print(" ")
 		print(rainbowName.." hooked events: ")
 		for k, v in pairs( hookedEvents ) do
-			print( color.red, k )
+			print( AvColors.red, k )
 		end
 	end,
 
@@ -396,7 +382,7 @@ slashCommands.listhooks = {
 slashCommands.dbwipe = {
 	func = function(...)
 		wipe(DataHoarderDB)
-		print(color.cyan.."DataHoarderDB"..color.red.." wiped.")
+		print(AvColors.cyan.."DataHoarderDB"..AvColors.red.." wiped.")
 	end,
 
 	desc = "Wipes database clean, without deleting the actual db"
@@ -407,9 +393,9 @@ slashCommands.spam = {
 	func = function(...)
 		doEventSpam = not doEventSpam
 		if doEventSpam then
-			print(rainbowName..": Event spam "..color.red.."enabled")
+			print(rainbowName..": Event spam "..AvColors.red.."enabled")
 		else
-			print(rainbowName..": Event spam "..color.green.."disabled")
+			print(rainbowName..": Event spam "..AvColors.green.."disabled")
 		end
 	end,
 
@@ -426,32 +412,19 @@ slashCommands.dbdump = {
 		print("\n")
 		print("DataHoarderDB contents:")
 
-		local function dumpTbl (tbl, indent)
-			local indent = indent or 0
-			for k, v in pairs(tbl) do
-				formatting = string.rep(color.purple .. "| - - ", indent) .. color.teal .. tostring(k)
-				if type(v) == "table" then
-					print(formatting .. color.green .. " +")
-					dumpTbl(v, indent+1)
-				else
-					print(formatting .. ": " .. color.cyan .. tostring(v))
-				end
-			end
-		end
-
-		dumpTbl(DataHoarderDB)
+		au_ppTable(DataHoarderDB)
 	end,
 
-	desc = ("Print the "..color.red.."entire DataHoarder database for this character!")
+	desc = ("Print the "..AvColors.red.."entire DataHoarder database for this character!")
 }
 
 
 slashCommands.dfunc = {
 	func = function(...)
-		print(color.pink.. "Nope.")
+		print(AvColors.pink.. "Nope.")
 	end,
 
-	desc = ("Debug function - "..color.red.."MAY DO ANYTHING")
+	desc = ("Debug function - "..AvColors.red.."MAY DO ANYTHING")
 	}
 
 
@@ -459,9 +432,9 @@ slashCommands.dfunc = {
 		func = function(...)
 			doVerboseErrors = not doVerboseErrors
 			if doVerboseErrors then
-				print(rainbowName..": Verbose error logging "..color.red.."enabled")
+				print(rainbowName..": Verbose error logging "..AvColors.red.."enabled")
 			else
-				print(rainbowName..": Verbose error logging "..color.green.."disabled")
+				print(rainbowName..": Verbose error logging "..AvColors.green.."disabled")
 			end
 		end,
 
@@ -495,19 +468,7 @@ slashCommands.dfunc = {
 				print(" ")
 				print("LevelData for level "..lvl..":")
 
-				local function dumpTbl (tbl, indent)
-					local indent = indent or 0
-					for k, v in pairs(tbl) do
-						formatting = string.rep(color.purple .. "| - - ", indent) .. color.teal .. tostring(k)
-						if type(v) == "table" then
-							print(formatting .. color.green .. " +")
-							dumpTbl(v, indent+1)
-						else
-							print(formatting .. ": " .. color.cyan .. tostring(v))
-						end
-					end
-				end
-				dumpTbl(DataHoarderDB.LevelData[lvl])
+				au_ppTable(DataHoarderDB.LevelData[lvl])
 			end
 
 			local dumpLvl = nil
@@ -518,10 +479,10 @@ slashCommands.dfunc = {
 					if DataHoarderDB.LevelData[dumpLvl] then
 						doDump(dumpLvl)
 					else
-						print( color.red.."Not a valid level: |r".. ...)
+						print( AvColors.red.."Not a valid level: |r".. ...)
 					end
 				else
-					print( color.red.."Not a valid level: |r".. ...)
+					print( AvColors.red.."Not a valid level: |r".. ...)
 				end
 			else
 				doDump(currentPlayerLevel)
@@ -559,9 +520,9 @@ slashCommands.dfunc = {
 			for k, v in pairs(slashCommands) do
 				print(k)
 				if v.desc then
-					print(color.cyan..slashListSeparator..color.orange..v.desc)
+					print(AvColors.cyan..slashListSeparator..AvColors.orange..v.desc)
 				else
-					print(slashListSeparator..color.red.."NoDesc")
+					print(slashListSeparator..AvColors.red.."NoDesc")
 				end
 			end
 		end
@@ -574,8 +535,8 @@ slashCommands.dfunc = {
 			printCmdList()
 		else
 			print(" ")
-			print(rainbowName.." unrecognized command: "..color.red..root)
-			print("List available commands with "..color.cyan.."/ava|r or "..color.cyan.."/avaddon")
+			print(rainbowName.." unrecognized command: "..AvColors.red..root)
+			print("List available commands with "..AvColors.cyan.."/ava|r or "..AvColors.cyan.."/avaddon")
 		end
 	end
 

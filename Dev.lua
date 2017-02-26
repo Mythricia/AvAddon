@@ -3,7 +3,7 @@
 
 local InstanceTable
 local tierList
-
+local _, addonTable = ...
 -- Programmatically generate list of all dungeons and raids, to be used in determining what expansion
 -- the instance your are currently inside, actually belongs to.
 
@@ -52,7 +52,7 @@ end
 
 
 
-function GetCurrentInstanceTier()
+function addonTable:GetCurrentInstanceTier()
   -- Check that the InstanceTable even exists, if not, create it
   if not InstanceTable then
     GenerateInstanceTable()
