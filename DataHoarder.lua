@@ -14,10 +14,6 @@ local currentPlayerLevel = 0
 -- Debug, damage logging accumulator
 local combatDamage = 0
 
--- This shouldn't be here, but it's here, so that I don't get a nil error when initializing DB later...
-DataHoarderDB = DataHoarderDB or {}
-
-
 -- Cache some common functions
 -- Common lua:
 local table = table
